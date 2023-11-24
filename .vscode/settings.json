@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    "*.embeddedhtml": "html",
+    "xtr1common": "cpp"
+  }
+}

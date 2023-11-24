@@ -1,0 +1,6 @@
+[submodule "deps/utils"]
+	path = deps/utils
+	url = https://github.com/mdecicco/utils.git
+[submodule "deps/glslang"]
+	path = deps/glslang
+	url = https://github.com/KhronosGroup/glslang.git
