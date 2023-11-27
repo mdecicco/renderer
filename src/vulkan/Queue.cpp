@@ -14,6 +14,10 @@ namespace render {
         Queue::~Queue() {
         }
 
+        VkQueue Queue::get() const {
+            return m_queue;
+        }
+
         LogicalDevice* Queue::getDevice() const {
             return m_device;
         }

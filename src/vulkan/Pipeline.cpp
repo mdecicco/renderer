@@ -4,6 +4,7 @@
 #include <render/vulkan/Instance.h>
 #include <render/vulkan/SwapChain.h>
 
+#include <utils/Array.hpp>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Public/ResourceLimits.h>
 #include <SPIRV/GlslangToSpv.h>
@@ -11,6 +12,54 @@
 
 namespace render {
     namespace vulkan {
+        static VkFormat dt_compTypes[dt_enum_count] = {
+            // dt_int
+            VK_FORMAT_R32_SINT,
+            // dt_float
+            VK_FORMAT_R32_SFLOAT,
+            // dt_uint
+            VK_FORMAT_R32_UINT,
+            // dt_vec2i
+            VK_FORMAT_R32G32_SINT,
+            // dt_vec2f
+            VK_FORMAT_R32G32_SFLOAT,
+            // dt_vec2ui
+            VK_FORMAT_R32G32_UINT,
+            // dt_vec3i
+            VK_FORMAT_R32G32B32_SINT,
+            // dt_vec3f
+            VK_FORMAT_R32G32B32_SFLOAT,
+            // dt_vec3ui
+            VK_FORMAT_R32G32B32_UINT,
+            // dt_vec4i
+            VK_FORMAT_R32G32B32A32_SINT,
+            // dt_vec4f
+            VK_FORMAT_R32G32B32A32_SFLOAT,
+            // dt_vec4ui
+            VK_FORMAT_R32G32B32A32_UINT,
+
+            // per-component types
+
+            // dt_mat2i
+            VK_FORMAT_R32G32_SINT,
+            // dt_mat2f
+            VK_FORMAT_R32G32_SFLOAT,
+            // dt_mat2ui
+            VK_FORMAT_R32G32_UINT,
+            // dt_mat3i
+            VK_FORMAT_R32G32B32_SINT,
+            // dt_mat3f
+            VK_FORMAT_R32G32B32_SFLOAT,
+            // dt_mat3ui
+            VK_FORMAT_R32G32B32_UINT,
+            // dt_mat4i
+            VK_FORMAT_R32G32B32A32_SINT,
+            // dt_mat4f
+            VK_FORMAT_R32G32B32A32_SFLOAT,
+            // dt_mat4ui
+            VK_FORMAT_R32G32B32A32_UINT,
+        };
+        
         Pipeline::Pipeline(ShaderCompiler* compiler, LogicalDevice* device, SwapChain* swapChain) : utils::IWithLogging("Vulkan Pipeline") {
             m_compiler = compiler;
             m_device = device;
@@ -31,6 +80,7 @@ namespace render {
         void Pipeline::reset() {
             shutdown();
 
+            m_vertexFormat = core::VertexFormat();
             m_scissorIsSet = false;
             setViewport(0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f);
             m_viewportDynamic = false;
@@ -62,7 +112,12 @@ namespace render {
             m_geomShader = nullptr;
             m_computeShader = nullptr;
         }
-
+        
+        void Pipeline::setVertexFormat(const core::VertexFormat& fmt) {
+            if (m_isInitialized) return;
+            m_vertexFormat = fmt;
+        }
+        
         bool Pipeline::setVertexShader(const utils::String& source) {
             if (m_vertexShader) return false;
             m_vertexShader = m_compiler->compileShader(source, EShLangVertex);
@@ -273,12 +328,54 @@ namespace render {
             di.dynamicStateCount = m_dynamicState.size();
             di.pDynamicStates = m_dynamicState.data();
 
+            utils::Array<VkVertexInputBindingDescription> vertexBindings;
+            utils::Array<VkVertexInputAttributeDescription> vertexAttribs;
+
+            if (m_vertexFormat) {
+                vertexBindings.emplace();
+                auto vbd = vertexBindings.last();
+                vbd.binding = vertexBindings.size() - 1;
+                vbd.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+                vbd.stride = m_vertexFormat.getSize();
+
+                auto va = m_vertexFormat.getAttributes();
+                u32 offset = 0;
+                u32 location = 0;
+                for (u32 i = 0;i < va.size();i++) {
+                    DATA_TYPE tp = va[i];
+
+                    u32 count = 1;
+                    if (tp == dt_mat2i || tp == dt_mat2f || tp == dt_mat2ui) {
+                        // 2x vec2
+                        count = 2;
+                    } else if (tp == dt_mat3i || tp == dt_mat3f || tp == dt_mat3ui) {
+                        // 3x vec3
+                        count = 3;
+                    } else if (tp == dt_mat4i || tp == dt_mat4f || tp == dt_mat4ui) {
+                        // 4x vec4
+                        count = 4;
+                    }
+
+                    for (u32 c = 0;c < count;c++) {
+                        vertexAttribs.emplace();
+                        auto a = vertexAttribs.last();
+                        a.binding = vertexAttribs.size() - 1;
+                        a.offset = offset;
+                        a.location = location;
+                        a.format = dt_compTypes[tp];
+
+                        location++;
+                        offset += core::VertexFormat::AttributeSize(va[i]);
+                    }
+                }
+            }
+
             VkPipelineVertexInputStateCreateInfo vi = {};
             vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-            vi.vertexBindingDescriptionCount = m_vertexBindings.size();
-            vi.pVertexBindingDescriptions = m_vertexBindings.data();
-            vi.vertexAttributeDescriptionCount = m_vertexAttribs.size();
-            vi.pVertexAttributeDescriptions = m_vertexAttribs.data();
+            vi.vertexBindingDescriptionCount = vertexBindings.size();
+            vi.pVertexBindingDescriptions = vertexBindings.data();
+            vi.vertexAttributeDescriptionCount = vertexAttribs.size();
+            vi.pVertexAttributeDescriptions = vertexAttribs.data();
 
             VkPipelineInputAssemblyStateCreateInfo ai = {};
             ai.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -377,6 +474,8 @@ namespace render {
                     case BF_SRC1_ALPHA: return VK_BLEND_FACTOR_SRC1_ALPHA;
                     case BF_ONE_MINUS_SRC1_ALPHA: return VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
                 }
+
+                return VK_BLEND_FACTOR_ZERO;
             };
 
             auto blendOp = [](BLEND_OP bo) {
@@ -387,6 +486,8 @@ namespace render {
                     case BO_MIN: return VK_BLEND_OP_MIN;
                     case BO_MAX: return VK_BLEND_OP_MAX;
                 }
+
+                return VK_BLEND_OP_ADD;
             };
 
             VkPipelineColorBlendAttachmentState cbai = {};
@@ -440,7 +541,15 @@ namespace render {
             VkSubpassDescription sd = {};
             sd.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
             sd.colorAttachmentCount = 1;
-            sd.pColorAttachments = &ar;
+            sd.pColorAttachments = &ar; 
+
+            VkSubpassDependency dep = {};
+            dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+            dep.dstSubpass = 0;
+            dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            dep.srcAccessMask = 0;
+            dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            dep.dstAccessMask = 0;
 
             VkRenderPassCreateInfo rpi = {};
             rpi.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -448,6 +557,8 @@ namespace render {
             rpi.pAttachments = &ca;
             rpi.subpassCount = 1;
             rpi.pSubpasses = &sd;
+            rpi.dependencyCount = 1;
+            rpi.pDependencies = &dep;
 
             if (vkCreateRenderPass(m_device->get(), &rpi, m_device->getInstance()->getAllocator(), &m_renderPass) != VK_SUCCESS) {
                 error("Failed to create pipeline layout");
@@ -479,6 +590,28 @@ namespace render {
                 return false;
             }
 
+            auto iv = m_swapChain->getImageViews();
+            auto extent = m_swapChain->getExtent();
+            for (u32 i = 0;i < iv.size();i++) {
+                VkFramebufferCreateInfo fbi = {};
+                fbi.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+                fbi.renderPass = m_renderPass;
+                fbi.attachmentCount = 1;
+                fbi.pAttachments = &iv[i];
+                fbi.width = extent.width;
+                fbi.height = extent.height;
+                fbi.layers = 1;
+
+                VkFramebuffer fb = VK_NULL_HANDLE;
+                if (vkCreateFramebuffer(m_device->get(), &fbi, m_device->getInstance()->getAllocator(), &fb) != VK_SUCCESS) {
+                    error(utils::String::Format("Failed to create framebuffer[%d]", i));
+                    shutdown();
+                    return false;
+                }
+
+                m_framebuffers.push(fb);
+            }
+
             return true;
         }
 
@@ -488,14 +621,44 @@ namespace render {
             });
             m_shaderModules.clear();
 
+            m_framebuffers.each([this](VkFramebuffer fb) {
+                vkDestroyFramebuffer(m_device->get(), fb, m_device->getInstance()->getAllocator());
+            });
+            m_framebuffers.clear();
+
             if (m_layout) vkDestroyPipelineLayout(m_device->get(), m_layout, m_device->getInstance()->getAllocator());
             if (m_renderPass) vkDestroyRenderPass(m_device->get(), m_renderPass, m_device->getInstance()->getAllocator());
             if (m_pipeline) vkDestroyPipeline(m_device->get(), m_pipeline, m_device->getInstance()->getAllocator());
+
+            if (m_vertexShader) delete m_vertexShader;
+            m_vertexShader = nullptr;
+            if (m_fragShader) delete m_fragShader;
+            m_fragShader = nullptr;
+            if (m_geomShader) delete m_geomShader;
+            m_geomShader = nullptr;
+            if (m_computeShader) delete m_computeShader;
+            m_computeShader = nullptr;
 
             m_layout = VK_NULL_HANDLE;
             m_renderPass = VK_NULL_HANDLE;
             m_pipeline = VK_NULL_HANDLE;
             m_isInitialized = false;
+        }
+
+        VkPipeline Pipeline::get() const {
+            return m_pipeline;
+        }
+
+        VkRenderPass Pipeline::getRenderPass() const {
+            return m_renderPass;
+        }
+
+        SwapChain* Pipeline::getSwapChain() const {
+            return m_swapChain;
+        }
+        
+        const utils::Array<VkFramebuffer>& Pipeline::getFramebuffers() const {
+            return m_framebuffers;
         }
 
         bool Pipeline::processShader(
@@ -550,7 +713,7 @@ namespace render {
 
             VkShaderModuleCreateInfo ci = {};
             ci.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            ci.codeSize = code.size();
+            ci.codeSize = code.size() * sizeof(u32);
             ci.pCode = code.data();
 
             VkShaderModule mod = VK_NULL_HANDLE;
@@ -565,9 +728,25 @@ namespace render {
 
             VkPipelineShaderStageCreateInfo si = {};
             si.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            si.stage = VK_SHADER_STAGE_VERTEX_BIT;
             si.module = mod;
             si.pName = "main";
+
+            switch (lang) {
+                case EShLangVertex: { si.stage = VK_SHADER_STAGE_VERTEX_BIT; break; }
+                case EShLangTessControl: { si.stage = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT; break; }
+                case EShLangTessEvaluation: { si.stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT; break; }
+                case EShLangGeometry: { si.stage = VK_SHADER_STAGE_GEOMETRY_BIT; break; }
+                case EShLangFragment: { si.stage = VK_SHADER_STAGE_FRAGMENT_BIT; break; }
+                case EShLangCompute: { si.stage = VK_SHADER_STAGE_COMPUTE_BIT; break; }
+                case EShLangRayGen: { si.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR; break; }
+                case EShLangIntersect: { si.stage = VK_SHADER_STAGE_INTERSECTION_BIT_KHR; break; }
+                case EShLangAnyHit: { si.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR; break; }
+                case EShLangClosestHit: { si.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR; break; }
+                case EShLangMiss: { si.stage = VK_SHADER_STAGE_MISS_BIT_KHR; break; }
+                case EShLangCallable: { si.stage = VK_SHADER_STAGE_CALLABLE_BIT_KHR; break; }
+                case EShLangTask: { si.stage = VK_SHADER_STAGE_TASK_BIT_EXT; break; }
+                case EShLangMesh: { si.stage = VK_SHADER_STAGE_MESH_BIT_EXT; break; }
+            }
 
             m_shaderModules.push(mod);
             stages.push(si);

@@ -38,6 +38,10 @@ namespace render {
             return m_imageViews;
         }
         
+        const VkExtent2D& SwapChain::getExtent() const {
+            return m_extent;
+        }
+        
         VkFormat SwapChain::getFormat() const {
             return m_format;
         }
@@ -61,6 +65,15 @@ namespace render {
 
             auto capabilities = support.getCapabilities();
 
+            if (capabilities.currentExtent.width != UINT32_MAX) {
+                m_extent = capabilities.currentExtent;
+            } else {
+                surface->getWindow()->getSize(
+                    &m_extent.width,
+                    &m_extent.height
+                );
+            }
+
             VkSwapchainCreateInfoKHR ci = {};
             ci.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
             ci.surface = m_surface->get();
@@ -73,15 +86,8 @@ namespace render {
             ci.imageArrayLayers = 1;
             ci.clipped = VK_TRUE;
             ci.oldSwapchain = previous ? previous->get() : VK_NULL_HANDLE;
-
-            if (capabilities.currentExtent.width != UINT32_MAX) {
-                ci.imageExtent = capabilities.currentExtent;
-            } else {
-                surface->getWindow()->getSize(
-                    &ci.imageExtent.width,
-                    &ci.imageExtent.height
-                );
-            }
+            ci.imageExtent = m_extent;
+            ci.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
             auto presentQueue = device->getPresentationQueue();
             auto gfxQueue = device->getGraphicsQueue();
@@ -141,6 +147,7 @@ namespace render {
                     shutdown();
                     return false;
                 }
+                m_imageViews.push(view);
             }
 
             m_format = format;

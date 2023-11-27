@@ -9,6 +9,7 @@ namespace render {
         class LogicalDevice;
         class Queue {
             public:
+                VkQueue get() const;
                 LogicalDevice* getDevice() const;
                 const QueueFamily& getFamily() const;
                 u32 getIndex() const;

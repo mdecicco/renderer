@@ -1,13 +1,9 @@
 #pragma once
 #include <render/types.h>
+
 #include <utils/String.h>
 #include <utils/ILogListener.h>
-
-enum EShLanguage;
-
-namespace glslang {
-    class TShader;
-};
+#include <glslang/Public/ShaderLang.h>
 
 namespace render {
     namespace vulkan {

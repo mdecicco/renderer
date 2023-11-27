@@ -1,111 +1,116 @@
 #include <exception>
 #include <stdio.h>
 
+#include <render/IWithRendering.h>
+#include <render/vulkan/Pipeline.h>
+#include <render/vulkan/CommandPool.h>
+#include <render/vulkan/CommandBuffer.h>
+#include <render/vulkan/Queue.h>
+#include <render/vulkan/LogicalDevice.h>
+
 #include <utils/Allocator.hpp>
 #include <utils/Singleton.hpp>
-#include <utils/Array.hpp>
-#include <utils/String.h>
 #include <utils/Window.h>
 
-#include <render/vulkan/Instance.h>
-#include <render/vulkan/PhysicalDevice.h>
-#include <render/vulkan/LogicalDevice.h>
-#include <render/vulkan/Surface.h>
-#include <render/vulkan/SwapChainSupport.h>
-#include <render/vulkan/SwapChain.h>
-#include <render/vulkan/ShaderCompiler.h>
-
-class logger : public utils::ILogListener {
+class TestApp : public render::IWithRendering {
     public:
+        TestApp() {
+            m_window.setPosition(500, 500);
+            m_window.setSize(800, 600);
+            m_window.setTitle("Vulkan Test");
+
+            m_pipeline = nullptr;
+            m_cmdPool = nullptr;
+            m_cmdBuf = nullptr;
+        }
+
+        virtual ~TestApp() {
+            if (m_cmdPool) delete m_cmdPool;
+            m_cmdPool = nullptr;
+            if (m_pipeline) delete m_pipeline;
+            m_pipeline = nullptr;
+        }
+
+        bool initialize() {
+            if (!m_window.setOpen(true)) return false;
+            if (!initRendering(&m_window)) return false;
+
+            m_pipeline = new render::vulkan::Pipeline(
+                getShaderCompiler(),
+                getLogicalDevice(),
+                getSwapChain()
+            );
+
+            const char* vsh =
+                "layout (location = 0) in vec3 v_pos;\n"
+                "\n"
+                "void main() {\n"
+                "  gl_Position = vec4(v_pos, 1.0);\n"
+                "}\n"
+            ;
+            const char* fsh =
+                "layout (location = 1) out vec4 o_color;\n"
+                "\n"
+                "void main() {\n"
+                "    o_color = vec4(1.0, 1.0, 1.0, 1.0);\n"
+                "}\n"
+            ;
+            
+            render::core::VertexFormat vfmt;
+            vfmt.addAttr(render::dt_vec3f);
+
+            m_pipeline->setVertexFormat(vfmt);
+
+            if (!m_pipeline->setVertexShader(vsh)) return false;
+            if (!m_pipeline->setFragmentShader(fsh)) return false;
+            if (!m_pipeline->init()) return false;
+
+            m_cmdPool = new render::vulkan::CommandPool(
+                getLogicalDevice(),
+                &getLogicalDevice()->getGraphicsQueue()->getFamily()
+            );
+            if (!m_cmdPool->init(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)) {
+                return false;
+            }
+
+            m_cmdBuf = m_cmdPool->createBuffer(true);
+
+            return true;
+        }
+
+        void run() {
+            while (m_window.isOpen()) {
+                m_window.pollEvents();
+                utils::Thread::Sleep(16);
+                
+                begin(m_cmdBuf, m_pipeline);
+                end(m_cmdBuf, m_pipeline);
+            }
+
+            waitForFrameEnd();
+        }
+
         virtual void onLogMessage(utils::LOG_LEVEL level, const utils::String& scope, const utils::String& message) {
             utils::String msg = scope + ": " + message;
             printf("%s\n", msg.c_str());
+            fflush(stdout);
         }
+    
+    protected:
+        utils::Window m_window;
+        render::vulkan::Pipeline* m_pipeline;
+        render::vulkan::CommandPool* m_cmdPool;
+        render::vulkan::CommandBuffer* m_cmdBuf;
 };
 
 int main(int argc, char** argv) {
     utils::Mem::Create();
 
     {
-        utils::Window w;
-        w.setPosition(500, 500);
-        w.setSize(800, 600);
-        w.setTitle("Vulkan Test");
-        if (!w.setOpen(true)) abort();
+        TestApp app;
 
-        render::vulkan::Instance vi;
-        logger l;
-
-        vi.subscribeLogger(&l);
-        vi.enableValidation();
-        vi.initialize();
-
-        render::vulkan::Surface s(&vi, &w);
-        if (!s.init()) abort();
-
-        auto devices = render::vulkan::PhysicalDevice::list(&vi);
-
-        render::vulkan::PhysicalDevice* gpu = nullptr;
-        render::vulkan::SwapChainSupport swapChainSupport;
-
-        for (render::u32 i = 0;i < devices.size() && !gpu;i++) {
-            if (!devices[i].isDiscrete()) continue;
-            if (!devices[i].isExtensionAvailable(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) continue;
-
-            if (!devices[i].getSurfaceSwapChainSupport(&s, &swapChainSupport)) continue;
-            if (!swapChainSupport.isValid()) continue;
-
-            if (!swapChainSupport.hasFormat(VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)) continue;
-            if (!swapChainSupport.hasPresentMode(VK_PRESENT_MODE_FIFO_KHR)) continue;
-
-            auto& capabilities = swapChainSupport.getCapabilities();
-            if (capabilities.maxImageCount > 0 && capabilities.maxImageCount < 3) continue;
-
-            gpu = &devices[i];
-        }
-
-        if (!gpu) abort();
-
-        render::vulkan::LogicalDevice dev(gpu);
-        if (!dev.enableExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) abort();
-        if (!dev.init(true, false, false, &s)) abort();
-
-        render::vulkan::SwapChain chain;
-        chain.init(
-            &s,
-            &dev,
-            swapChainSupport,
-            VK_FORMAT_B8G8R8A8_SRGB,
-            VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
-            VK_PRESENT_MODE_FIFO_KHR,
-            3
-        );
-
-        if (!chain.isValid()) abort();
-
-        render::vulkan::ShaderCompiler sh;
-        sh.subscribeLogger(&l);
-        if (!sh.init()) abort();
-
-        auto out = sh.compileShader(
-            "layout (location = 1) in vec4 v_pos;\n"
-            "layout (set = 0, binding = 0) uniform Matrices {\n"
-            "    uniform mat4 model;\n"
-            "    uniform mat4 view;\n"
-            "    uniform mat4 projection;\n"
-            "} matrices;\n"
-            "\n"
-            "void main() {\n"
-            "  gl_Position = matrices.projection * matrices.view * matrices.model * v_pos;\n"
-            "}\n",
-            glslang::EShLanguage::
-        );
-
-        if (!out) abort();
-
-        delete out;
-
-        utils::Thread::Sleep(1000);
+        if (!app.initialize()) abort();
+        app.run();
     }
 
     utils::Mem::Destroy();

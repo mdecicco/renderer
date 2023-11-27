@@ -13,6 +13,31 @@ namespace render {
     typedef float       f32;
     typedef double      f64;
 
+    enum DATA_TYPE {
+        dt_int = 0,
+        dt_float,
+        dt_uint,
+        dt_vec2i,
+        dt_vec2f,
+        dt_vec2ui,
+        dt_vec3i,
+        dt_vec3f,
+        dt_vec3ui,
+        dt_vec4i,
+        dt_vec4f,
+        dt_vec4ui,
+        dt_mat2i,
+        dt_mat2f,
+        dt_mat2ui,
+        dt_mat3i,
+        dt_mat3f,
+        dt_mat3ui,
+        dt_mat4i,
+        dt_mat4f,
+        dt_mat4ui,
+        dt_enum_count
+    };
+
     enum PRIMITIVE_TYPE {
         PT_POINTS,
         PT_LINES,

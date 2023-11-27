@@ -28,6 +28,7 @@ endmacro(add_sources)
 
 add_sources("src"           ".")
 add_sources("src"           "vulkan")
+add_sources("src"           "core")
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory("./deps")

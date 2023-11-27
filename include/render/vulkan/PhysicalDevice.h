@@ -13,6 +13,7 @@ namespace render {
 
         class PhysicalDevice {
             public:
+                PhysicalDevice(const PhysicalDevice& dev);
                 ~PhysicalDevice();
                 static utils::Array<PhysicalDevice> list(Instance* instance);
 

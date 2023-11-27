@@ -12,21 +12,25 @@ cd "./include/render/%dir_name%"
 %printf% "#pragma once\n" >> %header_name%
 %printf% "#include <render/types.h>\n\n" >> %header_name%
 %printf% "namespace render {\n" >> %header_name%
-%printf% "    class %class_name% {\n" >> %header_name%
-%printf% "        public:\n" >> %header_name%
-%printf% "            %class_name%();\n" >> %header_name%
-%printf% "            ~%class_name%();\n" >> %header_name%
+%printf% "    namespace %dir_name% {\n" >> %header_name%
+%printf% "        class %class_name% {\n" >> %header_name%
+%printf% "            public:\n" >> %header_name%
+%printf% "                %class_name%();\n" >> %header_name%
+%printf% "                ~%class_name%();\n" >> %header_name%
+%printf% "        };\n" >> %header_name%
 %printf% "    };\n" >> %header_name%
 %printf% "};" >> %header_name%
 
 cd "../../../src/%dir_name%"
 %printf% "#include <render/%dir_name%/%header_name%>\n\n" >> %src_name%
 %printf% "namespace render {\n" >> %src_name%
-%printf% "    %class_name%::%class_name%() {\n" >> %src_name%
-%printf% "    }\n" >> %src_name%
+%printf% "    namespace %dir_name% {\n" >> %src_name%
+%printf% "        %class_name%::%class_name%() {\n" >> %src_name%
+%printf% "        }\n" >> %src_name%
 %printf% "\n" >> %src_name%
-%printf% "    %class_name%::~%class_name%() {\n" >> %src_name%
-%printf% "    }\n" >> %src_name%
+%printf% "        %class_name%::~%class_name%() {\n" >> %src_name%
+%printf% "        }\n" >> %src_name%
+%printf% "    };\n" >> %src_name%
 %printf% "};" >> %src_name%
 
 cd "../../"

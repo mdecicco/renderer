@@ -15,6 +15,15 @@ namespace render {
             m_features = {};
         }
 
+        PhysicalDevice::PhysicalDevice(const PhysicalDevice& dev) {
+            m_instance = dev.m_instance;
+            m_handle = dev.m_handle;
+            m_props = dev.m_props;
+            m_features = dev.m_features;
+            m_availableExtensions = dev.m_availableExtensions;
+            m_availableLayers = dev.m_availableLayers;
+        }
+
         PhysicalDevice::~PhysicalDevice() {
         }
 

@@ -19,6 +19,7 @@ namespace render {
                 bool isValid() const;
                 const utils::Array<VkImage>& getImages() const;
                 const utils::Array<VkImageView>& getImageViews() const;
+                const VkExtent2D& getExtent() const;
                 VkFormat getFormat() const;
 
                 bool init(
@@ -40,6 +41,7 @@ namespace render {
                 LogicalDevice* m_device;
                 VkSwapchainKHR m_swapChain;
                 VkFormat m_format;
+                VkExtent2D m_extent;
                 utils::Array<VkImage> m_images;
                 utils::Array<VkImageView> m_imageViews;
         };

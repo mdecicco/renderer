@@ -1,16 +1,12 @@
 #pragma once
 #include <render/types.h>
+#include <render/core/VertexFormat.h>
 
 #include <utils/Array.h>
 #include <utils/ILogListener.h>
+
 #include <vulkan/vulkan.h>
-
-enum EShLanguage;
-
-namespace glslang {
-    class TShader;
-    class TProgram;
-};
+#include <glslang/Public/ShaderLang.h>
 
 namespace render {
     namespace vulkan {
@@ -25,6 +21,7 @@ namespace render {
 
                 void reset();
 
+                void setVertexFormat(const core::VertexFormat& fmt);
                 bool setVertexShader(const utils::String& source);
                 bool setFragmentShader(const utils::String& source);
                 bool setGeometryShader(const utils::String& source);
@@ -56,6 +53,11 @@ namespace render {
                 bool init();
                 void shutdown();
 
+                VkPipeline get() const;
+                VkRenderPass getRenderPass() const;
+                SwapChain* getSwapChain() const;
+                const utils::Array<VkFramebuffer>& getFramebuffers() const;
+
             protected:
                 bool processShader(
                     glslang::TProgram& prog,
@@ -69,6 +71,7 @@ namespace render {
                 VkPipelineLayout m_layout;
                 VkRenderPass m_renderPass;
                 VkPipeline m_pipeline;
+                core::VertexFormat m_vertexFormat;
                 bool m_isInitialized;
                 bool m_scissorIsSet;
 
@@ -79,8 +82,7 @@ namespace render {
 
                 utils::Array<VkShaderModule> m_shaderModules;
                 utils::Array<VkDynamicState> m_dynamicState;
-                utils::Array<VkVertexInputBindingDescription> m_vertexBindings;
-                utils::Array<VkVertexInputAttributeDescription> m_vertexAttribs;
+                utils::Array<VkFramebuffer> m_framebuffers;
 
                 // state
                 VkViewport m_viewport;
