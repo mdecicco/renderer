@@ -76,5 +76,19 @@ namespace render {
             m_buffers.push(buf);
             return buf;
         }
+
+        void CommandPool::freeBuffer(CommandBuffer* buffer) {
+            if (buffer->m_pool != this) return;
+            
+            i64 idx = m_buffers.findIndex([buffer](CommandBuffer* b) {
+                return b == buffer;
+            });
+
+            if (idx == -1) return;
+
+            vkFreeCommandBuffers(m_device->get(), m_pool, 1, &buffer->m_buffer);
+            m_buffers.remove(u32(idx));
+            delete buffer;
+        }
     };
 };

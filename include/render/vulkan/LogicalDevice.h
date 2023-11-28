@@ -22,6 +22,7 @@ namespace render {
                 bool isExtensionEnabled(const char* name) const;
                 bool enableLayer(const char* name);
                 bool isLayerEnabled(const char* name) const;
+                bool waitForIdle() const;
 
                 bool init(bool needsGraphics, bool needsCompute, bool needsTransfer, Surface* surface);
                 void shutdown();

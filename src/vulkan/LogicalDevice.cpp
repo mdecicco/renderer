@@ -64,6 +64,11 @@ namespace render {
             return false;
         }
 
+        bool LogicalDevice::waitForIdle() const {
+            if (!m_isInitialized) return true;
+            return vkDeviceWaitIdle(m_device) == VK_SUCCESS;
+        }
+
         bool LogicalDevice::init(bool needsGraphics, bool needsCompute, bool needsTransfer, Surface* surface) {
             if (m_isInitialized || !m_physicalDevice) return false;
 

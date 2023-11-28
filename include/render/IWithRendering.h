@@ -3,7 +3,9 @@
 
 #include <utils/ILogListener.h>
 #include <utils/Array.h>
+#include <utils/Input.h>
 #include <vulkan/vulkan.h>
+
 namespace utils {
     class Window;
 };
@@ -21,8 +23,12 @@ namespace render {
         class Pipeline;
     };
 
+    namespace core {
+        class FrameManager;
+        class FrameContext;
+    };
 
-    class IWithRendering : public utils::IWithLogging {
+    class IWithRendering : public utils::IWithLogging, utils::IInputHandler {
         public:
             IWithRendering();
             virtual ~IWithRendering();
@@ -32,10 +38,7 @@ namespace render {
             virtual bool setupDevice(vulkan::LogicalDevice* device);
             virtual bool setupSwapchain(vulkan::SwapChain* swapChain, const vulkan::SwapChainSupport& support);
             virtual bool setupShaderCompiler(vulkan::ShaderCompiler* shaderCompiler);
-
-            bool begin(vulkan::CommandBuffer* cb, vulkan::Pipeline* pipeline);
-            bool end(vulkan::CommandBuffer* cb, vulkan::Pipeline* pipeline);
-            bool waitForFrameEnd();
+            virtual void onWindowResize(utils::Window* win, u32 width, u32 height);
 
             utils::Window* getWindow() const;
             vulkan::Instance* getInstance() const;
@@ -44,6 +47,9 @@ namespace render {
             vulkan::Surface* getSurface() const;
             vulkan::SwapChain* getSwapChain() const;
             vulkan::ShaderCompiler* getShaderCompiler() const;
+            core::FrameManager* getFrameManager() const;
+            core::FrameContext* getFrame(vulkan::Pipeline* pipeline) const;
+            void releaseFrame(core::FrameContext* frame);
 
             bool initRendering(utils::Window* win);
             void shutdownRendering();
@@ -56,12 +62,8 @@ namespace render {
             vulkan::Surface* m_surface;
             vulkan::SwapChain* m_swapChain;
             vulkan::ShaderCompiler* m_shaderCompiler;
-            VkSemaphore m_swapChainReady;
-            VkSemaphore m_renderComplete;
-            VkFence m_frameFence;
+            core::FrameManager* m_frameMgr;
 
             bool m_initialized;
-            bool m_frameStarted;
-            u32 m_currentImageIndex;
     };
 };

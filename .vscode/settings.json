@@ -44,6 +44,15 @@
     "xloctime": "cpp",
     "xmemory": "cpp",
     "xstring": "cpp",
-    "xutility": "cpp"
+    "xutility": "cpp",
+    "cmath": "cpp",
+    "forward_list": "cpp",
+    "limits": "cpp",
+    "numeric": "cpp",
+    "span": "cpp",
+    "valarray": "cpp",
+    "vector": "cpp",
+    "xhash": "cpp",
+    "xtree": "cpp"
   }
 }

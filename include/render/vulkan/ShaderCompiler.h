@@ -15,7 +15,7 @@ namespace render {
                 bool init();
                 void shutdown();
 
-                glslang::TShader* compileShader(const utils::String& source, EShLanguage type) const;
+                glslang::TShader* compileShader(const utils::String& source, EShLanguage type);
             
             protected:
                 bool m_isInitialized;

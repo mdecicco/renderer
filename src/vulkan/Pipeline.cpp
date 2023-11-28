@@ -71,10 +71,12 @@ namespace render {
             m_isInitialized = false;
 
             reset();
+            swapChain->onPipelineCreated(this);
         }
 
         Pipeline::~Pipeline() {
             shutdown();
+            m_swapChain->onPipelineDestroyed(this);
         }
 
         void Pipeline::reset() {
@@ -121,25 +123,37 @@ namespace render {
         bool Pipeline::setVertexShader(const utils::String& source) {
             if (m_vertexShader) return false;
             m_vertexShader = m_compiler->compileShader(source, EShLangVertex);
-            return m_vertexShader != nullptr;
+
+            if (m_vertexShader == nullptr) return false;
+            m_vertexShaderSrc = source;
+            return true;
         }
 
         bool Pipeline::setFragmentShader(const utils::String& source) {
             if (m_fragShader) return false;
             m_fragShader = m_compiler->compileShader(source, EShLangFragment);
-            return m_fragShader != nullptr;
+
+            if (m_fragShader == nullptr) return false;
+            m_fragShaderSrc = source;
+            return true;
         }
 
         bool Pipeline::setGeometryShader(const utils::String& source) {
             if (m_geomShader) return false;
             m_geomShader = m_compiler->compileShader(source, EShLangGeometry);
-            return m_geomShader != nullptr;
+
+            if (m_geomShader == nullptr) return false;
+            m_geomShaderSrc = source;
+            return true;
         }
 
         bool Pipeline::setComputeShader(const utils::String& source) {
             if (m_computeShader) return false;
             m_computeShader = m_compiler->compileShader(source, EShLangCompute);
-            return m_computeShader != nullptr;
+
+            if (m_computeShader == nullptr) return false;
+            m_computeShaderSrc = source;
+            return true;
         }
         
         void Pipeline::setViewport(f32 x, f32 y, f32 w, f32 h, f32 minZ, f32 maxZ) {
@@ -643,6 +657,18 @@ namespace render {
             m_renderPass = VK_NULL_HANDLE;
             m_pipeline = VK_NULL_HANDLE;
             m_isInitialized = false;
+        }
+        
+        bool Pipeline::recreate() {
+            shutdown();
+
+            // glslang::TShader can't be reused...
+            if (m_vertexShaderSrc.size() > 0 && !setVertexShader(m_vertexShaderSrc)) return false;
+            if (m_fragShaderSrc.size() > 0 && !setFragmentShader(m_fragShaderSrc)) return false;
+            if (m_geomShaderSrc.size() > 0 && !setGeometryShader(m_geomShaderSrc)) return false;
+            if (m_computeShaderSrc.size() > 0 && !setComputeShader(m_computeShaderSrc)) return false;
+
+            return init();
         }
 
         VkPipeline Pipeline::get() const {

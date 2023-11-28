@@ -9,6 +9,7 @@ namespace render {
         class Surface;
         class SwapChainSupport;
         class LogicalDevice;
+        class Pipeline;
 
         class SwapChain {
             public:
@@ -34,16 +35,23 @@ namespace render {
                     VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
                     SwapChain* previous = nullptr
                 );
+                bool recreate();
                 void shutdown();
             
             protected:
+                friend class Pipeline;
+                void onPipelineCreated(Pipeline* pipeline);
+                void onPipelineDestroyed(Pipeline* pipeline);
+
                 Surface* m_surface;
                 LogicalDevice* m_device;
+                VkSwapchainCreateInfoKHR m_createInfo;
                 VkSwapchainKHR m_swapChain;
                 VkFormat m_format;
                 VkExtent2D m_extent;
                 utils::Array<VkImage> m_images;
                 utils::Array<VkImageView> m_imageViews;
+                utils::Array<Pipeline*> m_pipelines;
         };
     };
 };

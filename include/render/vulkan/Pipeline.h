@@ -52,6 +52,7 @@ namespace render {
 
                 bool init();
                 void shutdown();
+                bool recreate();
 
                 VkPipeline get() const;
                 VkRenderPass getRenderPass() const;
@@ -75,9 +76,13 @@ namespace render {
                 bool m_isInitialized;
                 bool m_scissorIsSet;
 
+                utils::String m_vertexShaderSrc;
                 glslang::TShader* m_vertexShader;
+                utils::String m_fragShaderSrc;
                 glslang::TShader* m_fragShader;
+                utils::String m_geomShaderSrc;
                 glslang::TShader* m_geomShader;
+                utils::String m_computeShaderSrc;
                 glslang::TShader* m_computeShader;
 
                 utils::Array<VkShaderModule> m_shaderModules;

@@ -22,6 +22,7 @@ namespace render {
                 VkCommandPoolCreateFlags getFlags() const;
 
                 CommandBuffer* createBuffer(bool primary);
+                void freeBuffer(CommandBuffer* buffer);
 
             protected:
                 LogicalDevice* m_device;

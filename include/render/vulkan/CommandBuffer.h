@@ -10,8 +10,6 @@ namespace render {
 
         class CommandBuffer {
             public:
-                ~CommandBuffer();
-                
                 VkCommandBuffer get() const;
                 CommandPool* getPool() const;
 
@@ -34,6 +32,7 @@ namespace render {
                 bool m_isRecording;
 
                 CommandBuffer();
+                ~CommandBuffer();
         };
     };
 };

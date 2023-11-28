@@ -14,6 +14,8 @@
 #include <render/vulkan/Pipeline.h>
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/Queue.h>
+#include <render/core/FrameManager.h>
+#include <render/core/FrameContext.h>
 
 namespace render {
     IWithRendering::IWithRendering() : utils::IWithLogging("Render") {
@@ -24,13 +26,9 @@ namespace render {
         m_surface = nullptr;
         m_swapChain = nullptr;
         m_shaderCompiler = nullptr;
-        m_swapChainReady = VK_NULL_HANDLE;
-        m_renderComplete = VK_NULL_HANDLE;
-        m_frameFence = VK_NULL_HANDLE;
+        m_frameMgr = nullptr;
 
         m_initialized = false;
-        m_frameStarted = false;
-        m_currentImageIndex = 0;
     }
 
     IWithRendering::~IWithRendering() {
@@ -83,72 +81,15 @@ namespace render {
     bool IWithRendering::setupShaderCompiler(vulkan::ShaderCompiler* shaderCompiler) {
         return true;
     }
-
-    bool IWithRendering::begin(vulkan::CommandBuffer* cb, vulkan::Pipeline* pipeline) {
-        if (m_frameStarted || !m_initialized) return false;
-
-        if (!waitForFrameEnd()) return false;
-
-        if (vkAcquireNextImageKHR(m_logicalDevice->get(), m_swapChain->get(), UINT64_MAX, m_swapChainReady, nullptr, &m_currentImageIndex) != VK_SUCCESS) {
-            return false;
+    
+    void IWithRendering::onWindowResize(utils::Window* win, u32 width, u32 height) {
+        if (!m_initialized || win != m_window) return;
+        log("Window resized, recreating swapchain (%dx%d)", width, height);
+        m_logicalDevice->waitForIdle();
+        if (!m_swapChain->recreate()) {
+            fatal("Failed to recreate swapchain after window resized.");
+            shutdownRendering();
         }
-
-        if (!cb->reset()) return false;
-        if (!cb->begin()) return false;
-
-        cb->beginRenderPass(pipeline, { 0.25f, 0.25f, 0.25f, 1.0f }, m_currentImageIndex);
-        m_frameStarted = true;
-
-        return true;
-    }
-
-    bool IWithRendering::end(vulkan::CommandBuffer* cb, vulkan::Pipeline* pipeline) {
-        if (!m_frameStarted) return false;
-
-        cb->endRenderPass();
-        if (!cb->end()) return false;
-
-        VkPipelineStageFlags sf = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        VkCommandBuffer buf = cb->get();
-        VkSwapchainKHR swap = m_swapChain->get();
-
-        VkSubmitInfo si = {};
-        si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        si.waitSemaphoreCount = 1;
-        si.pWaitSemaphores = &m_swapChainReady;
-        si.pWaitDstStageMask = &sf;
-        si.commandBufferCount = 1;
-        si.pCommandBuffers = &buf;
-        si.signalSemaphoreCount = 1;
-        si.pSignalSemaphores = &m_renderComplete;
-
-        if (vkQueueSubmit(m_logicalDevice->getGraphicsQueue()->get(), 1, &si, m_frameFence) != VK_SUCCESS) {
-            // not totally catastrophic
-            return true;
-        }
-        m_frameStarted = false;
-
-        VkPresentInfoKHR pi = {};
-        pi.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        pi.waitSemaphoreCount = 1;
-        pi.pWaitSemaphores = &m_renderComplete;
-        pi.swapchainCount = 1;
-        pi.pSwapchains = &swap;
-        pi.pImageIndices = &m_currentImageIndex;
-
-        if (vkQueuePresentKHR(m_logicalDevice->getGraphicsQueue()->get(), &pi) != VK_SUCCESS) {
-            // not totally catastrophic
-            return true;
-        }
-
-        return true;
-    }
-
-    bool IWithRendering::waitForFrameEnd() {
-        if (m_frameStarted || !m_initialized) return false;
-        if (vkWaitForFences(m_logicalDevice->get(), 1, &m_frameFence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) return false;
-        if (vkResetFences(m_logicalDevice->get(), 1, &m_frameFence) != VK_SUCCESS) return false;
-        return true;
     }
 
     utils::Window* IWithRendering::getWindow() const {
@@ -179,8 +120,24 @@ namespace render {
         return m_shaderCompiler;
     }
 
+    core::FrameManager* IWithRendering::getFrameManager() const {
+        return m_frameMgr;
+    }
+
+    core::FrameContext* IWithRendering::getFrame(vulkan::Pipeline* pipeline) const {
+        if (!m_initialized) return nullptr;
+
+        return m_frameMgr->getFrame(pipeline);
+    }
+
+    void IWithRendering::releaseFrame(core::FrameContext* frame) {
+        m_frameMgr->releaseFrame(frame);
+    }
+
     bool IWithRendering::initRendering(utils::Window* win) {
         if (m_initialized) return false;
+
+        m_window = win;
 
         m_instance = new vulkan::Instance();
         m_instance->subscribeLogger(this);
@@ -261,48 +218,25 @@ namespace render {
             return false;
         }
 
-        VkSemaphoreCreateInfo si = {};
-        si.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        if (vkCreateSemaphore(m_logicalDevice->get(), &si, m_instance->getAllocator(), &m_swapChainReady) != VK_SUCCESS) {
-            fatal("Failed to create swapchain semaphore.");
+        m_frameMgr = new core::FrameManager(m_logicalDevice, 2);
+        if (!m_frameMgr->init()) {
+            fatal("Failed to initialize frame manager.");
             shutdownRendering();
             return false;
         }
 
-        if (vkCreateSemaphore(m_logicalDevice->get(), &si, m_instance->getAllocator(), &m_renderComplete) != VK_SUCCESS) {
-            fatal("Failed to create render completion semaphore.");
-            shutdownRendering();
-            return false;
-        }
+        m_frameMgr->subscribeLogger(this);
 
-        VkFenceCreateInfo fi = {};
-        fi.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fi.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-        if (vkCreateFence(m_logicalDevice->get(), &fi, m_instance->getAllocator(), &m_frameFence) != VK_SUCCESS) {
-            fatal("Failed to create frame fence semaphore.");
-            shutdownRendering();
-            return false;
-        }
+        m_window->subscribe(this);
 
         m_initialized = true;
         return true;
     }
 
     void IWithRendering::shutdownRendering() {
-        if (m_frameFence) {
-            vkDestroyFence(m_logicalDevice->get(), m_frameFence, m_instance->getAllocator());
-            m_frameFence = VK_NULL_HANDLE;
-        }
-
-        if (m_renderComplete) {
-            vkDestroySemaphore(m_logicalDevice->get(), m_renderComplete, m_instance->getAllocator());
-            m_renderComplete = VK_NULL_HANDLE;
-        }
-
-        if (m_swapChainReady) {
-            vkDestroySemaphore(m_logicalDevice->get(), m_swapChainReady, m_instance->getAllocator());
-            m_swapChainReady = VK_NULL_HANDLE;
+        if (m_frameMgr) {
+            delete m_frameMgr;
+            m_frameMgr = nullptr;
         }
 
         if (m_shaderCompiler) {
@@ -333,6 +267,11 @@ namespace render {
         if (m_instance) {
             delete m_instance;
             m_instance = nullptr;
+        }
+
+        if (m_window) {
+            m_window->unsubscribe(this);
+            m_window = nullptr;
         }
 
         m_initialized = false;

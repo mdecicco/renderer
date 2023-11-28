@@ -134,7 +134,7 @@ namespace render {
             m_isInitialized = false;
         }
         
-        glslang::TShader* ShaderCompiler::compileShader(const utils::String& source, EShLanguage type) const {
+        glslang::TShader* ShaderCompiler::compileShader(const utils::String& source, EShLanguage type) {
             TBuiltInResource resources = DefaultResources();
             EShMessages messageFlags = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
 
