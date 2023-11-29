@@ -19,6 +19,7 @@ namespace render {
             m_instance = dev.m_instance;
             m_handle = dev.m_handle;
             m_props = dev.m_props;
+            m_memoryProps = dev.m_memoryProps;
             m_features = dev.m_features;
             m_availableExtensions = dev.m_availableExtensions;
             m_availableLayers = dev.m_availableLayers;
@@ -127,6 +128,10 @@ namespace render {
         const VkPhysicalDeviceProperties& PhysicalDevice::getProperties() const {
             return m_props;
         }
+        
+        const VkPhysicalDeviceMemoryProperties& PhysicalDevice::getMemoryProperties() const {
+            return m_memoryProps;
+        }
 
         const VkPhysicalDeviceFeatures& PhysicalDevice::getFeatures() const {
             return m_features;
@@ -159,6 +164,7 @@ namespace render {
                 dev.m_instance = instance;
                 vkGetPhysicalDeviceProperties(devices[i], &dev.m_props);
                 vkGetPhysicalDeviceFeatures(devices[i], &dev.m_features);
+                vkGetPhysicalDeviceMemoryProperties(devices[i], &dev.m_memoryProps);
 
                 u32 extCount = 0;
                 if (vkEnumerateDeviceExtensionProperties(devices[i], nullptr, &extCount, nullptr) != VK_SUCCESS) {

@@ -347,7 +347,7 @@ namespace render {
 
             if (m_vertexFormat) {
                 vertexBindings.emplace();
-                auto vbd = vertexBindings.last();
+                auto& vbd = vertexBindings.last();
                 vbd.binding = vertexBindings.size() - 1;
                 vbd.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
                 vbd.stride = m_vertexFormat.getSize();
@@ -372,8 +372,8 @@ namespace render {
 
                     for (u32 c = 0;c < count;c++) {
                         vertexAttribs.emplace();
-                        auto a = vertexAttribs.last();
-                        a.binding = vertexAttribs.size() - 1;
+                        auto& a = vertexAttribs.last();
+                        a.binding = vbd.binding;
                         a.offset = offset;
                         a.location = location;
                         a.format = dt_compTypes[tp];

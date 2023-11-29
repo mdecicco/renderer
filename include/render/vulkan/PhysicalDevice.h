@@ -29,6 +29,7 @@ namespace render {
 
                 VkPhysicalDevice get() const;
                 const VkPhysicalDeviceProperties& getProperties() const;
+                const VkPhysicalDeviceMemoryProperties& getMemoryProperties() const;
                 const VkPhysicalDeviceFeatures& getFeatures() const;
                 Instance* getInstance() const;
 
@@ -40,6 +41,7 @@ namespace render {
                 VkPhysicalDevice m_handle;
                 VkPhysicalDeviceProperties m_props;
                 VkPhysicalDeviceFeatures m_features;
+                VkPhysicalDeviceMemoryProperties m_memoryProps;
                 utils::Array<VkExtensionProperties> m_availableExtensions;
                 utils::Array<VkLayerProperties> m_availableLayers;
         };

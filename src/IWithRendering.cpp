@@ -14,6 +14,7 @@
 #include <render/vulkan/Pipeline.h>
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/Queue.h>
+#include <render/vulkan/VertexBuffer.h>
 #include <render/core/FrameManager.h>
 #include <render/core/FrameContext.h>
 
@@ -35,104 +36,7 @@ namespace render {
         shutdownRendering();
     }
     
-    const vulkan::PhysicalDevice* IWithRendering::choosePhysicalDevice(const utils::Array<vulkan::PhysicalDevice>& devices) {
-        const vulkan::PhysicalDevice* gpu = nullptr;
-        render::vulkan::SwapChainSupport swapChainSupport;
 
-        for (render::u32 i = 0;i < devices.size() && !gpu;i++) {
-            if (!devices[i].isDiscrete()) continue;
-            if (!devices[i].isExtensionAvailable(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) continue;
-
-            if (!devices[i].getSurfaceSwapChainSupport(m_surface, &swapChainSupport)) continue;
-            if (!swapChainSupport.isValid()) continue;
-
-            if (!swapChainSupport.hasFormat(VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)) continue;
-            if (!swapChainSupport.hasPresentMode(VK_PRESENT_MODE_FIFO_KHR)) continue;
-
-            auto& capabilities = swapChainSupport.getCapabilities();
-            if (capabilities.maxImageCount > 0 && capabilities.maxImageCount < 3) continue;
-
-            gpu = &devices[i];
-        }
-
-        return gpu;
-    }
-
-    bool IWithRendering::setupInstance(vulkan::Instance* instance) {
-        return true;
-    }
-    
-    bool IWithRendering::setupDevice(vulkan::LogicalDevice* device) {
-        return device->init(true, false, false, m_surface);
-    }
-    
-    bool IWithRendering::setupSwapchain(vulkan::SwapChain* swapChain, const vulkan::SwapChainSupport& support) {
-        return swapChain->init(
-            m_surface,
-            m_logicalDevice,
-            support,
-            VK_FORMAT_B8G8R8A8_SRGB,
-            VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
-            VK_PRESENT_MODE_FIFO_KHR,
-            3
-        );
-    }
-
-    bool IWithRendering::setupShaderCompiler(vulkan::ShaderCompiler* shaderCompiler) {
-        return true;
-    }
-    
-    void IWithRendering::onWindowResize(utils::Window* win, u32 width, u32 height) {
-        if (!m_initialized || win != m_window) return;
-        log("Window resized, recreating swapchain (%dx%d)", width, height);
-        m_logicalDevice->waitForIdle();
-        if (!m_swapChain->recreate()) {
-            fatal("Failed to recreate swapchain after window resized.");
-            shutdownRendering();
-        }
-    }
-
-    utils::Window* IWithRendering::getWindow() const {
-        return m_window;
-    }
-
-    vulkan::Instance* IWithRendering::getInstance() const {
-        return m_instance;
-    }
-
-    vulkan::PhysicalDevice* IWithRendering::getPhysicalDevice() const {
-        return m_physicalDevice;
-    }
-
-    vulkan::LogicalDevice* IWithRendering::getLogicalDevice() const {
-        return m_logicalDevice;
-    }
-
-    vulkan::Surface* IWithRendering::getSurface() const {
-        return m_surface;
-    }
-
-    vulkan::SwapChain* IWithRendering::getSwapChain() const {
-        return m_swapChain;
-    }
-    
-    vulkan::ShaderCompiler* IWithRendering::getShaderCompiler() const {
-        return m_shaderCompiler;
-    }
-
-    core::FrameManager* IWithRendering::getFrameManager() const {
-        return m_frameMgr;
-    }
-
-    core::FrameContext* IWithRendering::getFrame(vulkan::Pipeline* pipeline) const {
-        if (!m_initialized) return nullptr;
-
-        return m_frameMgr->getFrame(pipeline);
-    }
-
-    void IWithRendering::releaseFrame(core::FrameContext* frame) {
-        m_frameMgr->releaseFrame(frame);
-    }
 
     bool IWithRendering::initRendering(utils::Window* win) {
         if (m_initialized) return false;
@@ -225,6 +129,8 @@ namespace render {
             return false;
         }
 
+        m_vboFactory = new vulkan::VertexBufferFactory(m_logicalDevice, 8096);
+
         m_frameMgr->subscribeLogger(this);
 
         m_window->subscribe(this);
@@ -234,6 +140,11 @@ namespace render {
     }
 
     void IWithRendering::shutdownRendering() {
+        if (m_vboFactory) {
+            delete m_vboFactory;
+            m_vboFactory = nullptr;
+        }
+
         if (m_frameMgr) {
             delete m_frameMgr;
             m_frameMgr = nullptr;
@@ -275,5 +186,111 @@ namespace render {
         }
 
         m_initialized = false;
+    }
+
+
+
+    const vulkan::PhysicalDevice* IWithRendering::choosePhysicalDevice(const utils::Array<vulkan::PhysicalDevice>& devices) {
+        const vulkan::PhysicalDevice* gpu = nullptr;
+        render::vulkan::SwapChainSupport swapChainSupport;
+
+        for (render::u32 i = 0;i < devices.size() && !gpu;i++) {
+            if (!devices[i].isDiscrete()) continue;
+            if (!devices[i].isExtensionAvailable(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) continue;
+
+            if (!devices[i].getSurfaceSwapChainSupport(m_surface, &swapChainSupport)) continue;
+            if (!swapChainSupport.isValid()) continue;
+
+            if (!swapChainSupport.hasFormat(VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)) continue;
+            if (!swapChainSupport.hasPresentMode(VK_PRESENT_MODE_FIFO_KHR)) continue;
+
+            auto& capabilities = swapChainSupport.getCapabilities();
+            if (capabilities.maxImageCount > 0 && capabilities.maxImageCount < 3) continue;
+
+            gpu = &devices[i];
+        }
+
+        return gpu;
+    }
+
+    bool IWithRendering::setupInstance(vulkan::Instance* instance) {
+        return true;
+    }
+    
+    bool IWithRendering::setupDevice(vulkan::LogicalDevice* device) {
+        return device->init(true, false, false, m_surface);
+    }
+    
+    bool IWithRendering::setupSwapchain(vulkan::SwapChain* swapChain, const vulkan::SwapChainSupport& support) {
+        return swapChain->init(
+            m_surface,
+            m_logicalDevice,
+            support,
+            VK_FORMAT_B8G8R8A8_SRGB,
+            VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+            VK_PRESENT_MODE_FIFO_KHR,
+            3
+        );
+    }
+
+    bool IWithRendering::setupShaderCompiler(vulkan::ShaderCompiler* shaderCompiler) {
+        return true;
+    }
+    
+    void IWithRendering::onWindowResize(utils::Window* win, u32 width, u32 height) {
+        if (!m_initialized || win != m_window) return;
+        log("Window resized, recreating swapchain (%dx%d)", width, height);
+        m_logicalDevice->waitForIdle();
+        if (!m_swapChain->recreate()) {
+            fatal("Failed to recreate swapchain after window resized.");
+            shutdownRendering();
+        }
+    }
+
+    utils::Window* IWithRendering::getWindow() const {
+        return m_window;
+    }
+
+    vulkan::Instance* IWithRendering::getInstance() const {
+        return m_instance;
+    }
+
+    vulkan::PhysicalDevice* IWithRendering::getPhysicalDevice() const {
+        return m_physicalDevice;
+    }
+
+    vulkan::LogicalDevice* IWithRendering::getLogicalDevice() const {
+        return m_logicalDevice;
+    }
+
+    vulkan::Surface* IWithRendering::getSurface() const {
+        return m_surface;
+    }
+
+    vulkan::SwapChain* IWithRendering::getSwapChain() const {
+        return m_swapChain;
+    }
+    
+    vulkan::ShaderCompiler* IWithRendering::getShaderCompiler() const {
+        return m_shaderCompiler;
+    }
+
+    core::FrameManager* IWithRendering::getFrameManager() const {
+        return m_frameMgr;
+    }
+
+
+    core::FrameContext* IWithRendering::getFrame(vulkan::Pipeline* pipeline) const {
+        if (!m_initialized) return nullptr;
+
+        return m_frameMgr->getFrame(pipeline);
+    }
+
+    void IWithRendering::releaseFrame(core::FrameContext* frame) {
+        m_frameMgr->releaseFrame(frame);
+    }
+
+    vulkan::Vertices* IWithRendering::allocateVertices(core::VertexFormat* fmt, u32 count) {
+        return m_vboFactory->allocate(fmt, count);
     }
 };

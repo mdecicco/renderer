@@ -5,6 +5,7 @@
 #include <render/vulkan/QueueFamily.h>
 #include <render/vulkan/Pipeline.h>
 #include <render/vulkan/SwapChain.h>
+#include <render/vulkan/VertexBuffer.h>
 
 #include <utils/Array.hpp>
 
@@ -99,6 +100,13 @@ namespace render {
 
             vkCmdBindPipeline(m_buffer, bindPoint, pipeline->get());
         }
+        
+        void CommandBuffer::bindVertexBuffer(VertexBuffer* vbo) {
+            if (!m_buffer || !m_isRecording) return;
+            VkDeviceSize offset = 0;
+            VkBuffer buf = vbo->getBuffer();
+            vkCmdBindVertexBuffers(m_buffer, 0, 1, &buf, &offset);
+        }
 
         void CommandBuffer::setViewport(f32 x, f32 y, f32 width, f32 height, f32 minZ, f32 maxZ) {
             if (!m_buffer || !m_isRecording) return;
@@ -126,7 +134,13 @@ namespace render {
         }
         
         void CommandBuffer::draw(u32 vertexCount, u32 firstVertex, u32 instanceCount, u32 firstInstance) {
+            if (!m_buffer || !m_isRecording) return;
             vkCmdDraw(m_buffer, vertexCount, instanceCount, firstVertex, firstInstance);
+        }
+
+        void CommandBuffer::draw(Vertices* vertices) {
+            if (!m_buffer || !m_isRecording) return;
+            vkCmdDraw(m_buffer, vertices->getCount(), 1, vertices->getOffset(), 0);
         }
     };
 };

@@ -45,7 +45,7 @@ namespace render {
             if (!m_buffer->reset()) return false;
             if (!m_buffer->begin()) return false;
 
-            m_buffer->beginRenderPass(m_pipeline, { 0.25f, 0.25f, 0.25f, 1.0f }, m_scImageIdx);
+            m_buffer->beginRenderPass(m_pipeline, { 0.01f, 0.01f, 0.01f, 1.0f }, m_scImageIdx);
             m_frameStarted = true;
 
             return true;

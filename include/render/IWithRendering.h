@@ -4,7 +4,6 @@
 #include <utils/ILogListener.h>
 #include <utils/Array.h>
 #include <utils/Input.h>
-#include <vulkan/vulkan.h>
 
 namespace utils {
     class Window;
@@ -21,17 +20,23 @@ namespace render {
         class LogicalDevice;
         class CommandBuffer;
         class Pipeline;
+        class VertexBufferFactory;
+        class Vertices;
     };
 
     namespace core {
         class FrameManager;
         class FrameContext;
+        class VertexFormat;
     };
 
     class IWithRendering : public utils::IWithLogging, utils::IInputHandler {
         public:
             IWithRendering();
             virtual ~IWithRendering();
+
+            bool initRendering(utils::Window* win);
+            void shutdownRendering();
 
             virtual const vulkan::PhysicalDevice* choosePhysicalDevice(const utils::Array<vulkan::PhysicalDevice>& devices);
             virtual bool setupInstance(vulkan::Instance* instance);
@@ -48,11 +53,10 @@ namespace render {
             vulkan::SwapChain* getSwapChain() const;
             vulkan::ShaderCompiler* getShaderCompiler() const;
             core::FrameManager* getFrameManager() const;
+
             core::FrameContext* getFrame(vulkan::Pipeline* pipeline) const;
             void releaseFrame(core::FrameContext* frame);
-
-            bool initRendering(utils::Window* win);
-            void shutdownRendering();
+            vulkan::Vertices* allocateVertices(core::VertexFormat* format, u32 count);
         
         private:
             utils::Window* m_window;
@@ -62,6 +66,7 @@ namespace render {
             vulkan::Surface* m_surface;
             vulkan::SwapChain* m_swapChain;
             vulkan::ShaderCompiler* m_shaderCompiler;
+            vulkan::VertexBufferFactory* m_vboFactory;
             core::FrameManager* m_frameMgr;
 
             bool m_initialized;
