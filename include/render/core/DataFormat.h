@@ -5,11 +5,11 @@
 
 namespace render {
     namespace core {
-        class VertexFormat {
+        class DataFormat {
             public:
-                VertexFormat();
-                VertexFormat(const VertexFormat& o);
-                ~VertexFormat();
+                DataFormat();
+                DataFormat(const DataFormat& o);
+                ~DataFormat();
 
                 void addAttr(DATA_TYPE type);
 
@@ -17,8 +17,8 @@ namespace render {
                 u32 getSize() const;
 
                 operator bool() const;
-                bool operator==(const VertexFormat& rhs) const;
-                void operator=(const VertexFormat& rhs);
+                bool operator==(const DataFormat& rhs) const;
+                void operator=(const DataFormat& rhs);
 
                 static u32 AttributeSize(DATA_TYPE type);
             

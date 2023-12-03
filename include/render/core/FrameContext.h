@@ -17,6 +17,7 @@ namespace render {
             public:
                 vulkan::CommandBuffer* getCommandBuffer() const;
                 vulkan::Pipeline* getPipeline() const;
+                u32 getSwapChainImageIndex() const;
                 bool begin();
                 bool end();
 

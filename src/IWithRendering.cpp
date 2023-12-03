@@ -15,6 +15,7 @@
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/Queue.h>
 #include <render/vulkan/VertexBuffer.h>
+#include <render/vulkan/UniformBuffer.h>
 #include <render/core/FrameManager.h>
 #include <render/core/FrameContext.h>
 
@@ -28,6 +29,8 @@ namespace render {
         m_swapChain = nullptr;
         m_shaderCompiler = nullptr;
         m_frameMgr = nullptr;
+        m_vboFactory = nullptr;
+        m_uboFactory = nullptr;
 
         m_initialized = false;
     }
@@ -130,6 +133,7 @@ namespace render {
         }
 
         m_vboFactory = new vulkan::VertexBufferFactory(m_logicalDevice, 8096);
+        m_uboFactory = new vulkan::UniformBufferFactory(m_logicalDevice, 1024);
 
         m_frameMgr->subscribeLogger(this);
 
@@ -140,6 +144,11 @@ namespace render {
     }
 
     void IWithRendering::shutdownRendering() {
+        if (m_uboFactory) {
+            delete m_uboFactory;
+            m_uboFactory = nullptr;
+        }
+
         if (m_vboFactory) {
             delete m_vboFactory;
             m_vboFactory = nullptr;
@@ -290,7 +299,11 @@ namespace render {
         m_frameMgr->releaseFrame(frame);
     }
 
-    vulkan::Vertices* IWithRendering::allocateVertices(core::VertexFormat* fmt, u32 count) {
+    vulkan::Vertices* IWithRendering::allocateVertices(core::DataFormat* fmt, u32 count) {
         return m_vboFactory->allocate(fmt, count);
+    }
+    
+    vulkan::UniformObject* IWithRendering::allocateUniformObject(core::DataFormat* fmt, u32 bindIndex, vulkan::Pipeline* pipeline) {
+        return m_uboFactory->allocate(fmt, bindIndex, pipeline);
     }
 };

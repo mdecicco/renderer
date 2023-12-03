@@ -66,9 +66,11 @@ namespace render {
             m_swapChain = swapChain;
             m_layout = VK_NULL_HANDLE;
             m_renderPass = VK_NULL_HANDLE;
+            m_descriptorSetLayout = VK_NULL_HANDLE;
             m_pipeline = VK_NULL_HANDLE;
             m_vertexShader = m_fragShader = m_geomShader = m_computeShader = nullptr;
             m_isInitialized = false;
+            m_vertexFormat = nullptr;
 
             reset();
             swapChain->onPipelineCreated(this);
@@ -82,7 +84,7 @@ namespace render {
         void Pipeline::reset() {
             shutdown();
 
-            m_vertexFormat = core::VertexFormat();
+            m_vertexFormat = nullptr;
             m_scissorIsSet = false;
             setViewport(0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f);
             m_viewportDynamic = false;
@@ -114,8 +116,16 @@ namespace render {
             m_geomShader = nullptr;
             m_computeShader = nullptr;
         }
+
+        void Pipeline::addUniformBlock(u32 bindIndex, const core::DataFormat* fmt, VkShaderStageFlagBits stages) {
+            m_uniformBlocks.push({
+                bindIndex,
+                stages,
+                fmt
+            });
+        }
         
-        void Pipeline::setVertexFormat(const core::VertexFormat& fmt) {
+        void Pipeline::setVertexFormat(const core::DataFormat* fmt) {
             if (m_isInitialized) return;
             m_vertexFormat = fmt;
         }
@@ -345,14 +355,14 @@ namespace render {
             utils::Array<VkVertexInputBindingDescription> vertexBindings;
             utils::Array<VkVertexInputAttributeDescription> vertexAttribs;
 
-            if (m_vertexFormat) {
+            if (m_vertexFormat && *m_vertexFormat) {
                 vertexBindings.emplace();
                 auto& vbd = vertexBindings.last();
                 vbd.binding = vertexBindings.size() - 1;
                 vbd.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-                vbd.stride = m_vertexFormat.getSize();
+                vbd.stride = m_vertexFormat->getSize();
 
-                auto va = m_vertexFormat.getAttributes();
+                auto va = m_vertexFormat->getAttributes();
                 u32 offset = 0;
                 u32 location = 0;
                 for (u32 i = 0;i < va.size();i++) {
@@ -379,7 +389,7 @@ namespace render {
                         a.format = dt_compTypes[tp];
 
                         location++;
-                        offset += core::VertexFormat::AttributeSize(va[i]);
+                        offset += core::DataFormat::AttributeSize(va[i]);
                     }
                 }
             }
@@ -525,10 +535,33 @@ namespace render {
             cbsi.blendConstants[2] = 0.0f;
             cbsi.blendConstants[3] = 0.0f;
 
+            utils::Array<VkDescriptorSetLayoutBinding> descriptorSetBindings;
+            for (u32 i = 0;i < m_uniformBlocks.size();i++) {
+                descriptorSetBindings.push({});
+                auto& b = descriptorSetBindings.last();
+                auto& u = m_uniformBlocks[i];
+                b.binding = u.binding;
+                b.stageFlags = u.stages;
+                b.descriptorCount = 1;
+                b.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                b.pImmutableSamplers = VK_NULL_HANDLE;
+            }
+
+            VkDescriptorSetLayoutCreateInfo dsl = {};
+            dsl.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+            dsl.bindingCount = 1;
+            dsl.pBindings = descriptorSetBindings.data();
+
+            if (vkCreateDescriptorSetLayout(m_device->get(), &dsl, m_device->getInstance()->getAllocator(), &m_descriptorSetLayout) != VK_SUCCESS) {
+                error("Failed to create descriptor set layout");
+                shutdown();
+                return false;
+            }
+
             VkPipelineLayoutCreateInfo li = {};
             li.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-            li.setLayoutCount = 0;
-            li.pSetLayouts = nullptr;
+            li.setLayoutCount = 1;
+            li.pSetLayouts = &m_descriptorSetLayout;
             li.pushConstantRangeCount = 0;
             li.pPushConstantRanges = nullptr;
 
@@ -642,6 +675,7 @@ namespace render {
 
             if (m_layout) vkDestroyPipelineLayout(m_device->get(), m_layout, m_device->getInstance()->getAllocator());
             if (m_renderPass) vkDestroyRenderPass(m_device->get(), m_renderPass, m_device->getInstance()->getAllocator());
+            if (m_descriptorSetLayout) vkDestroyDescriptorSetLayout(m_device->get(), m_descriptorSetLayout, m_device->getInstance()->getAllocator());
             if (m_pipeline) vkDestroyPipeline(m_device->get(), m_pipeline, m_device->getInstance()->getAllocator());
 
             if (m_vertexShader) delete m_vertexShader;
@@ -655,6 +689,7 @@ namespace render {
 
             m_layout = VK_NULL_HANDLE;
             m_renderPass = VK_NULL_HANDLE;
+            m_descriptorSetLayout = VK_NULL_HANDLE;
             m_pipeline = VK_NULL_HANDLE;
             m_isInitialized = false;
         }
@@ -675,12 +710,20 @@ namespace render {
             return m_pipeline;
         }
 
+        VkPipelineLayout Pipeline::getLayout() const {
+            return m_layout;
+        }
+
         VkRenderPass Pipeline::getRenderPass() const {
             return m_renderPass;
         }
 
         SwapChain* Pipeline::getSwapChain() const {
             return m_swapChain;
+        }
+        
+        VkDescriptorSetLayout Pipeline::getDescriptorSetLayout() const {
+            return m_descriptorSetLayout;
         }
         
         const utils::Array<VkFramebuffer>& Pipeline::getFramebuffers() const {

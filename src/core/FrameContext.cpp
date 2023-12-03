@@ -31,6 +31,10 @@ namespace render {
         vulkan::Pipeline* FrameContext::getPipeline() const {
             return m_pipeline;
         }
+        
+        u32 FrameContext::getSwapChainImageIndex() const {
+            return m_scImageIdx;
+        }
 
         bool FrameContext::begin() {
             if (m_frameStarted) return false;
@@ -44,18 +48,13 @@ namespace render {
 
             if (!m_buffer->reset()) return false;
             if (!m_buffer->begin()) return false;
-
-            m_buffer->beginRenderPass(m_pipeline, { 0.01f, 0.01f, 0.01f, 1.0f }, m_scImageIdx);
             m_frameStarted = true;
 
             return true;
         }
 
         bool FrameContext::end() {
-            if (!m_frameStarted) return false;
-
-            m_buffer->endRenderPass();
-            if (!m_buffer->end()) return false;
+            if (!m_frameStarted || !m_buffer->end()) return false;
 
             VkPipelineStageFlags sf = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
             VkCommandBuffer buf = m_buffer->get();

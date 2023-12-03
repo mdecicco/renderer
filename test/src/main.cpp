@@ -6,6 +6,7 @@
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/LogicalDevice.h>
 #include <render/vulkan/VertexBuffer.h>
+#include <render/vulkan/UniformBuffer.h>
 #include <render/vulkan/Instance.h>
 #include <render/vulkan/SwapChain.h>
 #include <render/core/FrameContext.h>
@@ -14,6 +15,7 @@
 #include <utils/Singleton.hpp>
 #include <utils/Math.hpp>
 #include <utils/Window.h>
+#include <utils/Timer.h>
 
 struct vertex {
     utils::vec3f pos;
@@ -119,9 +121,12 @@ class TestApp : public render::IWithRendering {
                 "layout (location = 0) in vec3 v_pos;\n"
                 "layout (location = 1) in vec3 v_color;\n"
                 "layout (location = 0) out vec3 a_color;\n"
+                "layout (binding = 0) uniform _ubo {\n"
+                "    mat3 model;\n"
+                "} ubo;\n"
                 "\n"
                 "void main() {\n"
-                "  gl_Position = vec4(v_pos, 1.0);\n"
+                "  gl_Position = vec4((ubo.model * v_pos) + vec3(0, 0, 0.5), 1.0);\n"
                 "  a_color = v_color;\n"
                 "}\n"
             ;
@@ -136,10 +141,13 @@ class TestApp : public render::IWithRendering {
             
             m_vfmt.addAttr(render::dt_vec3f);
             m_vfmt.addAttr(render::dt_vec3f);
+            m_pipeline->setVertexFormat(&m_vfmt);
 
-            m_pipeline->setVertexFormat(m_vfmt);
-            auto e = getSwapChain()->getExtent();
-            m_pipeline->setViewport(0, 0, e.width, e.height, 0, 1);
+            m_ufmt.addAttr(render::dt_mat3f);
+            m_pipeline->addUniformBlock(0, &m_ufmt, VK_SHADER_STAGE_VERTEX_BIT);
+            
+            m_pipeline->addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
+            m_pipeline->addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
             m_pipeline->setPrimitiveType(render::PT_TRIANGLE_FAN);
 
             if (!m_pipeline->setVertexShader(vsh)) return false;
@@ -151,22 +159,28 @@ class TestApp : public render::IWithRendering {
 
         void run() {
             render::vulkan::Vertices* verts = allocateVertices(&m_vfmt, 362);
-            if (verts) {
-                if (verts->beginUpdate()) {
-                    verts->at<vertex>(0) = {
-                        utils::vec3f(0.0f, 0.0f, 0.0f),
-                        utils::vec3f(0.5f, 0.5f, 0.5f)
+            if (!verts) abort();
+
+            if (verts->beginUpdate()) {
+                verts->at<vertex>(0) = {
+                    utils::vec3f(0.0f, 0.0f, 0.0f),
+                    utils::vec3f(0.5f, 0.5f, 0.5f)
+                };
+                for (utils::u32 i = 1;i <= 361;i++) {
+                    utils::f32 t = utils::radians(utils::f32(i));
+                    verts->at<vertex>(i) = {
+                        utils::vec3f(cosf(t) * 0.5f, sinf(t) * 0.5f, 0.0f),
+                        hsv2rgb(utils::vec3f(utils::f32(i), 1.0f, 0.5f))
                     };
-                    for (utils::u32 i = 1;i <= 361;i++) {
-                        utils::f32 t = utils::radians(utils::f32(i));
-                        verts->at<vertex>(i) = {
-                            utils::vec3f(cosf(t) * 0.5f, sinf(t) * 0.5f, 0.1f),
-                            hsv2rgb(utils::vec3f(utils::f32(i), 1.0f, 0.5f))
-                        };
-                    }
-                    verts->commitUpdate();
                 }
+                verts->commitUpdate();
             }
+
+            render::vulkan::UniformObject* uniforms = allocateUniformObject(&m_ufmt, 0, m_pipeline);
+            if (!uniforms) abort();
+
+            utils::Timer tmr;
+            tmr.start();
 
             while (m_window->isOpen()) {
                 m_window->pollEvents();
@@ -175,10 +189,23 @@ class TestApp : public render::IWithRendering {
                 frame->begin();
                 auto cb = frame->getCommandBuffer();
 
+                utils::mat4f model = utils::mat4f::Rotation(utils::vec3f(0, 0, 1), tmr);
+                
+                uniforms->set(model);
+                uniforms->getBuffer()->submitUpdates(cb);
+
+                cb->beginRenderPass(m_pipeline, { 0.01f, 0.01f, 0.01f, 1.0f }, frame->getSwapChainImageIndex());
                 cb->bindPipeline(m_pipeline, VK_PIPELINE_BIND_POINT_GRAPHICS);
+
+                auto e = getSwapChain()->getExtent();
+                cb->setViewport(0, 0, e.width, e.height, 0, 1);
+                cb->setScissor(0, 0, e.width, e.height);
+
                 cb->bindVertexBuffer(verts->getBuffer());
+                cb->bindUniformObject(uniforms, VK_PIPELINE_BIND_POINT_GRAPHICS);
                 cb->draw(verts);
 
+                cb->endRenderPass();
                 frame->end();
 
                 getLogicalDevice()->waitForIdle();
@@ -188,6 +215,7 @@ class TestApp : public render::IWithRendering {
             }
 
             verts->free();
+            uniforms->free();
 
             getLogicalDevice()->waitForIdle();
         }
@@ -203,7 +231,8 @@ class TestApp : public render::IWithRendering {
     protected:
         utils::Window* m_window;
         render::vulkan::Pipeline* m_pipeline;
-        render::core::VertexFormat m_vfmt;
+        render::core::DataFormat m_vfmt;
+        render::core::DataFormat m_ufmt;
 };
 
 int main(int argc, char** argv) {

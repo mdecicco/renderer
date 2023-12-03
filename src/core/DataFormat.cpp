@@ -1,39 +1,39 @@
-#include <render/core/VertexFormat.h>
+#include <render/core/DataFormat.h>
 
 #include <utils/Array.hpp>
 
 namespace render {
     namespace core {
-        VertexFormat::VertexFormat() {
+        DataFormat::DataFormat() {
             m_size = 0;
         }
 
-        VertexFormat::VertexFormat(const VertexFormat& o) {
+        DataFormat::DataFormat(const DataFormat& o) {
             m_attrs = o.m_attrs;
             m_size = o.m_size;
         }
 
-        VertexFormat::~VertexFormat() {
+        DataFormat::~DataFormat() {
         }
 
-        void VertexFormat::addAttr(DATA_TYPE type) {
+        void DataFormat::addAttr(DATA_TYPE type) {
             m_attrs.push(type);
-            m_size += VertexFormat::AttributeSize(type);
+            m_size += DataFormat::AttributeSize(type);
         }
 
-        const utils::Array<DATA_TYPE>& VertexFormat::getAttributes() const {
+        const utils::Array<DATA_TYPE>& DataFormat::getAttributes() const {
             return m_attrs;
         }
 
-        u32 VertexFormat::getSize() const {
+        u32 DataFormat::getSize() const {
             return m_size;
         }
 
-        VertexFormat::operator bool() const {
+        DataFormat::operator bool() const {
             return m_size > 0;
         }
 
-        bool VertexFormat::operator==(const VertexFormat& rhs) const {
+        bool DataFormat::operator==(const DataFormat& rhs) const {
             if (m_size != rhs.m_size) return false;
             if (m_attrs.size() != rhs.m_attrs.size()) return false;
 
@@ -42,12 +42,12 @@ namespace render {
             });
         }
 
-        void VertexFormat::operator=(const VertexFormat& rhs) {
+        void DataFormat::operator=(const DataFormat& rhs) {
             m_size = rhs.m_size;
             m_attrs = rhs.m_attrs;
         }
 
-        u32 VertexFormat::AttributeSize(DATA_TYPE type) {
+        u32 DataFormat::AttributeSize(DATA_TYPE type) {
             static u32 dtSizes[dt_enum_count] = {
                 sizeof(i32),       // dt_int
                 sizeof(f32),       // dt_float

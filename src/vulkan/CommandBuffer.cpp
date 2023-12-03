@@ -6,6 +6,7 @@
 #include <render/vulkan/Pipeline.h>
 #include <render/vulkan/SwapChain.h>
 #include <render/vulkan/VertexBuffer.h>
+#include <render/vulkan/UniformBuffer.h>
 
 #include <utils/Array.hpp>
 
@@ -15,6 +16,7 @@ namespace render {
             m_pool = nullptr;
             m_buffer = VK_NULL_HANDLE;
             m_isRecording = false;
+            m_boundPipeline = nullptr;
         }
 
         CommandBuffer::~CommandBuffer() {
@@ -30,6 +32,8 @@ namespace render {
 
         bool CommandBuffer::begin(VkCommandBufferUsageFlagBits flags) {
             if (!m_buffer || m_isRecording) return false;
+            m_boundPipeline = nullptr;
+
             VkCommandBufferBeginInfo bi = {};
             bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
             bi.flags = flags;
@@ -99,6 +103,13 @@ namespace render {
             if (!m_buffer || !m_isRecording) return;
 
             vkCmdBindPipeline(m_buffer, bindPoint, pipeline->get());
+            m_boundPipeline = pipeline;
+        }
+        
+        void CommandBuffer::bindUniformObject(UniformObject* uo, VkPipelineBindPoint bindPoint) {
+            if (!m_buffer || !m_isRecording) return;
+            VkDescriptorSet set = uo->getDescriptorSet();
+            vkCmdBindDescriptorSets(m_buffer, bindPoint, m_boundPipeline->getLayout(), 0, 1, &set, 0, nullptr);
         }
         
         void CommandBuffer::bindVertexBuffer(VertexBuffer* vbo) {

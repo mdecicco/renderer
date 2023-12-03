@@ -22,12 +22,14 @@ namespace render {
         class Pipeline;
         class VertexBufferFactory;
         class Vertices;
+        class UniformBufferFactory;
+        class UniformObject;
     };
 
     namespace core {
         class FrameManager;
         class FrameContext;
-        class VertexFormat;
+        class DataFormat;
     };
 
     class IWithRendering : public utils::IWithLogging, utils::IInputHandler {
@@ -56,7 +58,8 @@ namespace render {
 
             core::FrameContext* getFrame(vulkan::Pipeline* pipeline) const;
             void releaseFrame(core::FrameContext* frame);
-            vulkan::Vertices* allocateVertices(core::VertexFormat* format, u32 count);
+            vulkan::Vertices* allocateVertices(core::DataFormat* format, u32 count);
+            vulkan::UniformObject* allocateUniformObject(core::DataFormat* format, u32 bindIndex, vulkan::Pipeline* pipeline);
         
         private:
             utils::Window* m_window;
@@ -67,6 +70,7 @@ namespace render {
             vulkan::SwapChain* m_swapChain;
             vulkan::ShaderCompiler* m_shaderCompiler;
             vulkan::VertexBufferFactory* m_vboFactory;
+            vulkan::UniformBufferFactory* m_uboFactory;
             core::FrameManager* m_frameMgr;
 
             bool m_initialized;

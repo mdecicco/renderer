@@ -6,7 +6,7 @@
 
 namespace render {
     namespace core {
-        class VertexFormat;
+        class DataFormat;
     };
 
     namespace vulkan {
@@ -15,14 +15,14 @@ namespace render {
 
         class VertexBuffer {
             public:
-                VertexBuffer(LogicalDevice* device, core::VertexFormat* fmt, u32 vertexCapacity);
+                VertexBuffer(LogicalDevice* device, core::DataFormat* fmt, u32 vertexCapacity);
                 ~VertexBuffer();
 
                 bool init();
                 void shutdown();
 
                 LogicalDevice* getDevice() const;
-                core::VertexFormat* getFormat() const;
+                core::DataFormat* getFormat() const;
                 VkBuffer getBuffer() const;
                 VkDeviceMemory getMemory() const;
                 u32 getCapacity() const;
@@ -49,7 +49,7 @@ namespace render {
                 void insertToFreeList(node* n);
 
                 LogicalDevice* m_device;
-                core::VertexFormat* m_fmt;
+                core::DataFormat* m_fmt;
                 u32 m_capacity;
                 u32 m_currentMaximumBlockSize;
                 u32 m_nodeCount;
@@ -87,11 +87,11 @@ namespace render {
             private:
                 friend class VertexBuffer;
 
-                Vertices(VertexBuffer* buf, core::VertexFormat* fmt, VertexBuffer::node* n);
+                Vertices(VertexBuffer* buf, core::DataFormat* fmt, VertexBuffer::node* n);
                 ~Vertices();
 
                 VertexBuffer* m_buffer;
-                core::VertexFormat* m_fmt;
+                core::DataFormat* m_fmt;
                 VertexBuffer::node* m_node;
                 VkMappedMemoryRange m_range;
                 void* m_mappedMemory;
@@ -104,13 +104,13 @@ namespace render {
 
                 void freeAll();
 
-                Vertices* allocate(core::VertexFormat* fmt, u32 count);
+                Vertices* allocate(core::DataFormat* fmt, u32 count);
             
             private:
                 LogicalDevice* m_device;
                 u32 m_maxBufCapacity;
 
-                utils::Array<core::VertexFormat*> m_formats;
+                utils::Array<core::DataFormat*> m_formats;
                 utils::Array<utils::Array<VertexBuffer*>> m_buffers;
         };
     };

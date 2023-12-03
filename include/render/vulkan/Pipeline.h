@@ -1,6 +1,6 @@
 #pragma once
 #include <render/types.h>
-#include <render/core/VertexFormat.h>
+#include <render/core/DataFormat.h>
 
 #include <utils/Array.h>
 #include <utils/ILogListener.h>
@@ -21,7 +21,8 @@ namespace render {
 
                 void reset();
 
-                void setVertexFormat(const core::VertexFormat& fmt);
+                void addUniformBlock(u32 bindIndex, const core::DataFormat* fmt, VkShaderStageFlagBits stages);
+                void setVertexFormat(const core::DataFormat* fmt);
                 bool setVertexShader(const utils::String& source);
                 bool setFragmentShader(const utils::String& source);
                 bool setGeometryShader(const utils::String& source);
@@ -55,8 +56,10 @@ namespace render {
                 bool recreate();
 
                 VkPipeline get() const;
+                VkPipelineLayout getLayout() const;
                 VkRenderPass getRenderPass() const;
                 SwapChain* getSwapChain() const;
+                VkDescriptorSetLayout getDescriptorSetLayout() const;
                 const utils::Array<VkFramebuffer>& getFramebuffers() const;
 
             protected:
@@ -66,13 +69,21 @@ namespace render {
                     utils::Array<VkPipelineShaderStageCreateInfo>& stages
                 );
 
+                struct uniform_block {
+                    u32 binding;
+                    VkShaderStageFlagBits stages;
+                    const core::DataFormat* format;
+                };
+
                 ShaderCompiler* m_compiler;
                 LogicalDevice* m_device;
                 SwapChain* m_swapChain;
                 VkPipelineLayout m_layout;
                 VkRenderPass m_renderPass;
+                VkDescriptorSetLayout m_descriptorSetLayout;
                 VkPipeline m_pipeline;
-                core::VertexFormat m_vertexFormat;
+                const core::DataFormat* m_vertexFormat;
+                utils::Array<uniform_block> m_uniformBlocks;
                 bool m_isInitialized;
                 bool m_scissorIsSet;
 

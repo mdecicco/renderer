@@ -2,7 +2,7 @@
 #include <render/vulkan/LogicalDevice.h>
 #include <render/vulkan/PhysicalDevice.h>
 #include <render/vulkan/Instance.h>
-#include <render/core/VertexFormat.h>
+#include <render/core/DataFormat.h>
 
 #include <utils/Array.hpp>
 
@@ -15,7 +15,7 @@ namespace render {
         // VertexBuffer
         //
 
-        VertexBuffer::VertexBuffer(LogicalDevice* device, core::VertexFormat* fmt, u32 vertexCapacity) {
+        VertexBuffer::VertexBuffer(LogicalDevice* device, core::DataFormat* fmt, u32 vertexCapacity) {
             m_device = device;
             m_fmt = fmt;
             m_capacity = vertexCapacity;
@@ -112,7 +112,7 @@ namespace render {
             return m_device;
         }
 
-        core::VertexFormat* VertexBuffer::getFormat() const {
+        core::DataFormat* VertexBuffer::getFormat() const {
             return m_fmt;
         }
 
@@ -174,6 +174,8 @@ namespace render {
 
             if (n->last) n->last->next = n->next;
             if (n->next) n->next->last = n->last;
+
+            if (n == m_usedBlocks) m_usedBlocks = n->next;
             
             insertToFreeList(n);
         }
@@ -319,7 +321,7 @@ namespace render {
         // Vertices
         //
 
-        Vertices::Vertices(VertexBuffer* buf, core::VertexFormat* fmt, VertexBuffer::node* n) {
+        Vertices::Vertices(VertexBuffer* buf, core::DataFormat* fmt, VertexBuffer::node* n) {
             m_buffer = buf;
             m_fmt = fmt;
             m_node = n;
@@ -451,13 +453,13 @@ namespace render {
             m_buffers.clear();
         }
 
-        Vertices* VertexBufferFactory::allocate(core::VertexFormat* fmt, u32 count) {
+        Vertices* VertexBufferFactory::allocate(core::DataFormat* fmt, u32 count) {
             if (count >= m_maxBufCapacity) {
                 m_device->getInstance()->error("Attempted to allocate more vertices than allowed by VertexBufferFactory (%lu)", m_maxBufCapacity);
                 return nullptr;
             }
 
-            i32 idx = m_formats.findIndex([fmt](core::VertexFormat* f) {
+            i32 idx = m_formats.findIndex([fmt](core::DataFormat* f) {
                 return (*f) == (*fmt);
             });
 

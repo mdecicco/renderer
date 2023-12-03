@@ -8,6 +8,7 @@ namespace render {
         class CommandPool;
         class Pipeline;
         class VertexBuffer;
+        class UniformObject;
         class Vertices;
 
         class CommandBuffer {
@@ -22,6 +23,7 @@ namespace render {
                 void beginRenderPass(Pipeline* pipeline, const VkClearValue& clearColor, u32 imageIdx);
                 void endRenderPass();
                 void bindPipeline(Pipeline* pipeline, VkPipelineBindPoint bindPoint);
+                void bindUniformObject(UniformObject* uo, VkPipelineBindPoint bindPoint);
                 void bindVertexBuffer(VertexBuffer* vbo);
                 void setViewport(f32 x, f32 y, f32 width, f32 height, f32 minZ, f32 maxZ);
                 void setScissor(i32 x, i32 y, u32 width, u32 height);
@@ -33,6 +35,7 @@ namespace render {
                 LogicalDevice* m_device;
                 CommandPool* m_pool;
                 VkCommandBuffer m_buffer;
+                Pipeline* m_boundPipeline;
                 bool m_isRecording;
 
                 CommandBuffer();
