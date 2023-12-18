@@ -53,6 +53,7 @@
     "valarray": "cpp",
     "vector": "cpp",
     "xhash": "cpp",
-    "xtree": "cpp"
+    "xtree": "cpp",
+    "ostream": "cpp"
   }
 }

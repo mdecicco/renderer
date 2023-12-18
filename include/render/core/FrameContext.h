@@ -8,32 +8,42 @@ namespace render {
     namespace vulkan {
         class LogicalDevice;
         class CommandBuffer;
-        class Pipeline;
+        class SwapChain;
+        class Framebuffer;
+        class RenderPass;
     };
 
     namespace core {
         class FrameManager;
-        class FrameContext : public utils::IWithLogging {
+        class FrameContext : public ::utils::IWithLogging {
             public:
                 vulkan::CommandBuffer* getCommandBuffer() const;
-                vulkan::Pipeline* getPipeline() const;
+                vulkan::SwapChain* getSwapChain() const;
+                vulkan::Framebuffer* getFramebuffer() const;
                 u32 getSwapChainImageIndex() const;
+                void setClearColor(u32 attachmentIdx, const vec4f& clearColor);
+                void setClearColor(u32 attachmentIdx, const vec4ui& clearColor);
+                void setClearColor(u32 attachmentIdx, const vec4i& clearColor);
+                void setClearDepthStencil(u32 attachmentIdx, f32 clearDepth, u32 clearStencil = 0);
                 bool begin();
                 bool end();
 
-            protected:
+            private:
                 friend class FrameManager;
                 FrameContext();
                 ~FrameContext();
 
-                bool init(vulkan::LogicalDevice* device);
+                bool init(vulkan::RenderPass* renderPass);
                 void shutdown();
-                void onAcquire(vulkan::CommandBuffer* buf, vulkan::Pipeline* pipeline);
+                void onAcquire(vulkan::CommandBuffer* buf);
                 void onFree();
 
                 vulkan::LogicalDevice* m_device;
-                vulkan::Pipeline* m_pipeline;
+                vulkan::SwapChain* m_swapChain;
                 vulkan::CommandBuffer* m_buffer;
+                vulkan::Framebuffer* m_framebuffer;
+                FrameManager* m_mgr;
+
                 VkSemaphore m_swapChainReady;
                 VkSemaphore m_renderComplete;
                 VkFence m_fence;

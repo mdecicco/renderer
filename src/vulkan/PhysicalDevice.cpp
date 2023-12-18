@@ -121,6 +121,23 @@ namespace render {
             return true;
         }
 
+        bool PhysicalDevice::getMemoryTypeIndex(const VkMemoryRequirements& reqs, VkMemoryPropertyFlags flags, u32* dst) const {
+            if (!dst) return false;
+
+            i32 memTypeIdx = -1;
+            for (u32 i = 0;i < m_memoryProps.memoryTypeCount;i++) {
+                if ((reqs.memoryTypeBits * (1 << i)) && (m_memoryProps.memoryTypes[i].propertyFlags & flags) == flags) {
+                    memTypeIdx = i;
+                    break;
+                }
+            }
+
+            if (memTypeIdx == -1) return false;
+
+            *dst = u32(memTypeIdx);
+            return true;
+        }
+
         VkPhysicalDevice PhysicalDevice::get() const {
             return m_handle;
         }
@@ -141,7 +158,7 @@ namespace render {
             return m_instance;
         }
 
-        utils::Array<PhysicalDevice> PhysicalDevice::list(Instance* instance) {
+        Array<PhysicalDevice> PhysicalDevice::list(Instance* instance) {
             if (!instance->isInitialized()) return {};
 
             u32 count = 0;
@@ -156,7 +173,7 @@ namespace render {
                 return {};
             }
 
-            utils::Array<PhysicalDevice> out(count);
+            Array<PhysicalDevice> out(count);
             for (u32 i = 0;i < count;i++) {
                 out.emplace();
                 PhysicalDevice& dev = out.last();

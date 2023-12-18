@@ -7,6 +7,8 @@
 namespace render {
     namespace vulkan {
         class LogicalDevice;
+        class CommandBuffer;
+
         class Queue {
             public:
                 VkQueue get() const;
@@ -17,6 +19,17 @@ namespace render {
                 bool supportsGraphics() const;
                 bool supportsCompute() const;
                 bool supportsTransfer() const;
+
+                bool submit(
+                    CommandBuffer* buffer,
+                    VkFence fence = VK_NULL_HANDLE,
+                    u32 waitForCount = 0,
+                    VkSemaphore* waitFor = nullptr,
+                    u32 signalCount = 0,
+                    VkSemaphore* signal = nullptr,
+                    VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_NONE
+                ) const;
+                bool waitForIdle() const;
 
             protected:
                 friend class LogicalDevice;

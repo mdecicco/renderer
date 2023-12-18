@@ -12,11 +12,11 @@ namespace render {
         class Instance;
         class Surface {
             public:
-                Surface(Instance* instance, utils::Window* window);
+                Surface(Instance* instance, ::utils::Window* window);
                 ~Surface();
 
                 VkSurfaceKHR get() const;
-                utils::Window* getWindow() const;
+                ::utils::Window* getWindow() const;
                 bool isInitialized() const;
 
                 bool init();
@@ -24,7 +24,7 @@ namespace render {
             
             protected:
                 Instance* m_instance;
-                utils::Window* m_window;
+                ::utils::Window* m_window;
                 VkSurfaceKHR m_surface;
         };
     };

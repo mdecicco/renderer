@@ -119,7 +119,7 @@ namespace render {
             }
         }
 
-        void Instance::setApplicationName(const utils::String& name) {
+        void Instance::setApplicationName(const String& name) {
             if (m_isInitialized) return;
             m_applicationName = name;
         }
@@ -129,7 +129,7 @@ namespace render {
             m_applicationVersion = VK_MAKE_VERSION(major, minor, patch);
         }
 
-        void Instance::setEngineName(const utils::String& name) {
+        void Instance::setEngineName(const String& name) {
             if (m_isInitialized) return;
             m_engineName = name;
         }
@@ -310,7 +310,7 @@ namespace render {
             else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) level = utils::LOG_WARNING;
             else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) level = utils::LOG_ERROR;
 
-            utils::String msg;
+            String msg;
             if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) msg += "[GENERAL]";
             if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) msg += "[VALIDATION]";
             if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) msg += "[PERFORMANCE]";

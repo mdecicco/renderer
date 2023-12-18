@@ -1,7 +1,6 @@
 #pragma once
 #include <render/types.h>
 
-#include <utils/Array.h>
 #include <vulkan/vulkan.h>
 
 namespace render {
@@ -23,10 +22,10 @@ namespace render {
                 Instance* getInstance() const;
                 i32 getIndex() const;
 
-                static utils::Array<QueueFamily> list(PhysicalDevice* device);
+                static Array<QueueFamily> list(PhysicalDevice* device);
             
             protected:
-                friend class utils::Array<QueueFamily>;
+                friend class ::utils::Array<QueueFamily>;
                 QueueFamily();
 
                 VkQueueFamilyProperties m_props;

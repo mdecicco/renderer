@@ -15,21 +15,20 @@ namespace render {
         // UniformBuffer
         //
 
-        UniformBuffer::UniformBuffer(LogicalDevice* device, core::DataFormat* fmt, u32 objectCapacity) {
+        UniformBuffer::UniformBuffer(LogicalDevice* device, core::DataFormat* fmt, u32 objectCapacity) : m_buffer(device), m_stagingBuffer(device) {
             m_device = device;
             m_fmt = fmt;
             m_capacity = objectCapacity;
             m_usedCount = 0;
-            m_pool = VK_NULL_HANDLE;
-            m_stagingBuffer = VK_NULL_HANDLE;
-            m_stagingMemory = VK_NULL_HANDLE;
-            m_buffer = VK_NULL_HANDLE;
-            m_memory = VK_NULL_HANDLE;
             m_objects = nullptr;
             m_objUpdated = new u8[m_capacity];
             m_hasUpdates = false;
             m_minUpdateIdx = m_capacity;
             m_maxUpdateIdx = 0;
+            m_paddedObjectSize = m_fmt->getUniformBlockSize();
+
+            u32 alignment = device->getPhysicalDevice()->getProperties().limits.minUniformBufferOffsetAlignment;
+            if (alignment > 0) m_paddedObjectSize = (m_paddedObjectSize + alignment - 1) & ~(alignment - 1);
 
             m_nodes = new UniformObject[m_capacity];
             m_free = m_used = nullptr;
@@ -54,166 +53,53 @@ namespace render {
         }
 
         bool UniformBuffer::init() {
-            if (m_buffer) return false;
+            if (m_buffer.isValid()) return false;
 
-            VkDescriptorPoolSize ps = {};
-            ps.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            ps.descriptorCount = m_capacity;
+            bool r;
+            
+            r = m_stagingBuffer.init(
+                m_paddedObjectSize * m_capacity,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_SHARING_MODE_EXCLUSIVE,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            );
 
-            VkDescriptorPoolCreateInfo pi = {};
-            pi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-            pi.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-            pi.poolSizeCount = 1;
-            pi.pPoolSizes = &ps;
-            pi.maxSets = m_capacity;
+            if (!r) {
+                shutdown();
+                return false;
+            }
+            
+            r = m_buffer.init(
+                m_paddedObjectSize * m_capacity,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_SHARING_MODE_EXCLUSIVE,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            );
 
-            if (vkCreateDescriptorPool(m_device->get(), &pi, m_device->getInstance()->getAllocator(), &m_pool) != VK_SUCCESS) {
-                m_device->getInstance()->error("Failed to create descriptor pool for uniform buffer");
+            if (!r) {
                 shutdown();
                 return false;
             }
 
-            // Staging buffer
-            {
-                VkBufferCreateInfo bi = {};
-                bi.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-                bi.size = m_fmt->getSize() * m_capacity;
-                bi.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-                bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-                if (vkCreateBuffer(m_device->get(), &bi, m_device->getInstance()->getAllocator(), &m_stagingBuffer) != VK_SUCCESS) {
-                    m_device->getInstance()->error("Failed to create staging buffer (%llu bytes)", bi.size);
-                    shutdown();
-                    return false;
-                }
-
-                VkMemoryRequirements memReqs;
-                vkGetBufferMemoryRequirements(m_device->get(), m_stagingBuffer, &memReqs);
-
-                auto memProps = m_device->getPhysicalDevice()->getMemoryProperties();
-                auto memFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-                i32 memTypeIdx = -1;
-                for (u32 i = 0;i < memProps.memoryTypeCount;i++) {
-                    if ((memReqs.memoryTypeBits * (1 << i)) && (memProps.memoryTypes[i].propertyFlags & memFlags) == memFlags) {
-                        memTypeIdx = i;
-                        break;
-                    }
-                }
-
-                if (memTypeIdx == -1) {
-                    m_device->getInstance()->error("Failed to find correct memory type for staging uniform buffer");
-                    shutdown();
-                    return false;
-                }
-
-                VkMemoryAllocateInfo ai = {};
-                ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-                ai.allocationSize = memReqs.size;
-                ai.memoryTypeIndex = u32(memTypeIdx);
-
-                if (vkAllocateMemory(m_device->get(), &ai, m_device->getInstance()->getAllocator(), &m_stagingMemory) != VK_SUCCESS) {
-                    m_device->getInstance()->error("Failed to allocate %llu bytes for staging uniform buffer", ai.allocationSize);
-                    shutdown();
-                    return false;
-                }
-
-                if (vkBindBufferMemory(m_device->get(), m_stagingBuffer, m_stagingMemory, 0) != VK_SUCCESS) {
-                    m_device->getInstance()->error("Failed to bind allocated memory to staging uniform buffer");
-                    shutdown();
-                    return false;
-                }
-            }
-
-            // GPU buffer
-            {
-                VkBufferCreateInfo bi = {};
-                bi.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-                bi.size = m_fmt->getSize() * m_capacity;
-                bi.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-                bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-                
-                if (vkCreateBuffer(m_device->get(), &bi, m_device->getInstance()->getAllocator(), &m_buffer) != VK_SUCCESS) {
-                    m_device->getInstance()->error("Failed to create buffer (%llu bytes)", bi.size);
-                    shutdown();
-                    return false;
-                }
-
-                VkMemoryRequirements memReqs;
-                vkGetBufferMemoryRequirements(m_device->get(), m_buffer, &memReqs);
-
-                auto memProps = m_device->getPhysicalDevice()->getMemoryProperties();
-                auto memFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-                i32 memTypeIdx = -1;
-                for (u32 i = 0;i < memProps.memoryTypeCount;i++) {
-                    if ((memReqs.memoryTypeBits * (1 << i)) && (memProps.memoryTypes[i].propertyFlags & memFlags) == memFlags) {
-                        memTypeIdx = i;
-                        break;
-                    }
-                }
-
-                if (memTypeIdx == -1) {
-                    m_device->getInstance()->error("Failed to find correct memory type for uniform buffer");
-                    shutdown();
-                    return false;
-                }
-
-                VkMemoryAllocateInfo ai = {};
-                ai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-                ai.allocationSize = memReqs.size;
-                ai.memoryTypeIndex = u32(memTypeIdx);
-
-                if (vkAllocateMemory(m_device->get(), &ai, m_device->getInstance()->getAllocator(), &m_memory) != VK_SUCCESS) {
-                    m_device->getInstance()->error("Failed to allocate %llu bytes for uniform buffer", ai.allocationSize);
-                    shutdown();
-                    return false;
-                }
-
-                if (vkBindBufferMemory(m_device->get(), m_buffer, m_memory, 0) != VK_SUCCESS) {
-                    m_device->getInstance()->error("Failed to bind allocated memory to uniform buffer");
-                    shutdown();
-                    return false;
-                }
-            }
-
-            if (vkMapMemory(m_device->get(), m_stagingMemory, 0, VK_WHOLE_SIZE, 0, (void**)&m_objects) != VK_SUCCESS) {
+            if (!m_stagingBuffer.map()) {
                 m_device->getInstance()->error("Failed to map staging buffer for writing");
                 shutdown();
                 return false;
             }
 
+            m_objects = (u8*)m_stagingBuffer.getPointer();
+
             return true;
         }
 
         void UniformBuffer::shutdown() {
-            if (m_pool) {
-                vkDestroyDescriptorPool(m_device->get(), m_pool, m_device->getInstance()->getAllocator());
-                m_pool = VK_NULL_HANDLE;
-            }
-
             if (m_objects) {
-                vkUnmapMemory(m_device->get(), m_stagingMemory);
+                m_stagingBuffer.unmap();
                 m_objects = nullptr;
             }
 
-            if (m_stagingBuffer) {
-                vkDestroyBuffer(m_device->get(), m_stagingBuffer, m_device->getInstance()->getAllocator());
-                m_stagingBuffer = VK_NULL_HANDLE;
-            }
-
-            if (m_stagingMemory) {
-                vkFreeMemory(m_device->get(), m_stagingMemory, m_device->getInstance()->getAllocator());
-                m_stagingMemory = VK_NULL_HANDLE;
-            }
-
-            if (m_buffer) {
-                vkDestroyBuffer(m_device->get(), m_buffer, m_device->getInstance()->getAllocator());
-                m_buffer = VK_NULL_HANDLE;
-            }
-
-            if (m_memory) {
-                vkFreeMemory(m_device->get(), m_memory, m_device->getInstance()->getAllocator());
-                m_memory = VK_NULL_HANDLE;
-            }
+            m_stagingBuffer.shutdown();
+            m_buffer.shutdown();
 
             resetNodes();
 
@@ -232,15 +118,15 @@ namespace render {
         }
 
         VkBuffer UniformBuffer::getBuffer() const {
-            return m_buffer;
+            return m_buffer.get();
         }
 
         VkDeviceMemory UniformBuffer::getMemory() const {
-            return m_memory;
+            return m_buffer.getMemory();
         }
 
         u32 UniformBuffer::getCapacity() const {
-            if (!m_memory) return 0;
+            if (!m_buffer.isValid()) return 0;
             return m_capacity;
         }
 
@@ -248,40 +134,9 @@ namespace render {
             return m_capacity - m_usedCount;
         }
 
-        UniformObject* UniformBuffer::allocate(u32 bindIndex, Pipeline* pipeline) {
-            if (!m_memory || !m_free) return nullptr;
+        UniformObject* UniformBuffer::allocate() {
+            if (!m_buffer.isValid() || !m_free) return nullptr;
             UniformObject* n = m_free;
-
-            VkDescriptorSetLayout layout = pipeline->getDescriptorSetLayout();
-
-            VkDescriptorSetAllocateInfo ai = {};
-            ai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            ai.descriptorPool = m_pool;
-            ai.descriptorSetCount = 1;
-            ai.pSetLayouts = &layout;
-
-            if (vkAllocateDescriptorSets(m_device->get(), &ai, &n->m_set) != VK_SUCCESS) {
-                m_device->getInstance()->error("Failed to allocate descriptor set for uniform object");
-                return nullptr;
-            }
-
-            n->m_bindIdx = bindIndex;
-
-            VkDescriptorBufferInfo bi = {};
-            bi.buffer = m_buffer;
-            bi.offset = n->m_index * m_fmt->getSize();
-            bi.range = m_fmt->getSize();
-
-            VkWriteDescriptorSet wd = {};
-            wd.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            wd.dstSet = n->m_set;
-            wd.dstBinding = bindIndex;
-            wd.dstArrayElement = 0;
-            wd.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            wd.descriptorCount = 1;
-            wd.pBufferInfo = &bi;
-
-            vkUpdateDescriptorSets(m_device->get(), 1, &wd, 0, nullptr);
 
             m_free = n->m_next;
             if (m_free) m_free->m_last = nullptr;
@@ -295,14 +150,7 @@ namespace render {
         }
 
         void UniformBuffer::free(UniformObject* n) {
-            if (!m_memory || !m_used || !n || n->m_buffer != this) return;
-
-            if (vkFreeDescriptorSets(m_device->get(), m_pool, 1, &n->m_set) != VK_SUCCESS) {
-                m_device->getInstance()->error("Failed to free descriptor set for uniform object");
-            }
-
-            n->m_set = VK_NULL_HANDLE;
-            n->m_bindIdx = 0;
+            if (!m_buffer.isValid() || !m_used || !n || n->m_buffer != this) return;
 
             if (n->m_last) n->m_last->m_next = n->m_next;
             if (n->m_next) n->m_next->m_last = n->m_last;
@@ -314,9 +162,7 @@ namespace render {
         }
 
         void UniformBuffer::submitUpdates(CommandBuffer* cb) {
-            if (!m_memory || !m_hasUpdates) return;
-
-            u32 objSize = m_fmt->getSize();
+            if (!m_buffer.isValid() || !m_hasUpdates) return;
 
             m_copyRanges.clear(false);
             VkBufferCopy* cur = nullptr;
@@ -333,16 +179,23 @@ namespace render {
                 if (doStartNewRange) {
                     m_copyRanges.emplace();
                     cur = &m_copyRanges.last();
-                    cur->srcOffset = cur->dstOffset = i * objSize;
-                    cur->size = objSize;
+                    cur->srcOffset = cur->dstOffset = i * m_paddedObjectSize;
+                    cur->size = m_paddedObjectSize;
                     doStartNewRange = false;
                     continue;
                 }
 
-                cur->size += objSize;
+                cur->size += m_paddedObjectSize;
             }
 
-            vkCmdCopyBuffer(cb->get(), m_stagingBuffer, m_buffer, m_copyRanges.size(), m_copyRanges.data());
+            vkCmdCopyBuffer(
+                cb->get(),
+                m_stagingBuffer.get(),
+                m_buffer.get(),
+                m_copyRanges.size(),
+                m_copyRanges.data()
+            );
+
             m_hasUpdates = false;
             m_minUpdateIdx = m_capacity;
             m_maxUpdateIdx = 0;
@@ -403,12 +256,131 @@ namespace render {
         
         void UniformBuffer::updateObject(UniformObject* n, const void* data) {
             u32 idx = n->m_index;
-            u32 sz = m_fmt->getSize();
-            memcpy(m_objects + (idx * sz), data, sz);
+            copyData(m_fmt, (u8*)data, m_objects + (idx * m_paddedObjectSize));
+
             m_hasUpdates = true;
             m_objUpdated[idx] = 1;
             m_minUpdateIdx = utils::min(m_minUpdateIdx, idx);
             m_maxUpdateIdx = utils::max(m_maxUpdateIdx, idx);
+        }
+        
+        u8* UniformBuffer::copyData(const core::DataFormat* fmt, const u8* src, u8* dst) {
+            auto& attrs = fmt->getAttributes();
+            for (u32 i = 0;i < attrs.size();i++) {
+                auto& a = attrs[i];
+                switch (a.type) {
+                    case dt_int:
+                    case dt_float:
+                    case dt_uint: {
+                        u32* dstE = (u32*)dst;
+                        const u32* srcE = (u32*)(src + a.offset);
+                        for (u32 c = 0;c < a.elementCount;c++) *(dstE++) = *(srcE++);
+
+                        dst += a.uniformAlignedSize;
+                        break;
+                    }
+                    case dt_vec2i:
+                    case dt_vec2f:
+                    case dt_vec2ui: {
+                        u32* dstE = (u32*)dst;
+                        const u32* srcE = (u32*)(src + a.offset);
+                        for (u32 c = 0;c < a.elementCount;c++) {
+                            *(dstE++) = *(srcE++); // x
+                            *(dstE++) = *(srcE++); // y
+                        }
+
+                        dst += a.uniformAlignedSize;
+                        break;
+                    }
+                    case dt_vec3i:
+                    case dt_vec3f:
+                    case dt_vec3ui: {
+                        u32* dstE = (u32*)dst;
+                        const u32* srcE = (u32*)(src + a.offset);
+                        for (u32 c = 0;c < a.elementCount;c++) {
+                            *(dstE++) = *(srcE++); // x
+                            *(dstE++) = *(srcE++); // y
+                            *(dstE++) = *(srcE++); // z
+                            *(dstE++) = 0; // 4 bytes padding for vulkan only
+                        }
+
+                        dst += a.uniformAlignedSize;
+                        break;
+                    }
+                    case dt_vec4i:
+                    case dt_vec4f:
+                    case dt_vec4ui: {
+                        u32* dstE = (u32*)dst;
+                        const u32* srcE = (u32*)(src + a.offset);
+                        for (u32 c = 0;c < a.elementCount;c++) {
+                            *(dstE++) = *(srcE++); // x
+                            *(dstE++) = *(srcE++); // y
+                            *(dstE++) = *(srcE++); // z
+                            *(dstE++) = *(srcE++); // w
+                        }
+
+                        dst += a.uniformAlignedSize;
+                        break;
+                    }
+                    case dt_mat3i:
+                    case dt_mat3f:
+                    case dt_mat3ui: {
+                        u32* dstE = (u32*)dst;
+                        const u32* srcE = (u32*)(src + a.offset);
+                        for (u32 c = 0;c < a.elementCount;c++) {
+                            *(dstE++) = *(srcE++); // mat.x.x
+                            *(dstE++) = *(srcE++); // mat.x.y
+                            *(dstE++) = *(srcE++); // mat.x.z
+                            *(dstE++) = 0; // 4 bytes padding for vulkan only
+                            *(dstE++) = *(srcE++); // mat.y.x
+                            *(dstE++) = *(srcE++); // mat.y.y
+                            *(dstE++) = *(srcE++); // mat.y.z
+                            *(dstE++) = 0; // 4 bytes padding for vulkan only
+                            *(dstE++) = *(srcE++); // mat.z.x
+                            *(dstE++) = *(srcE++); // mat.z.y
+                            *(dstE++) = *(srcE++); // mat.z.z
+                            *(dstE++) = 0; // 4 bytes padding for vulkan only
+                        }
+
+                        dst += a.uniformAlignedSize;
+                        break;
+                    }
+                    case dt_mat4i:
+                    case dt_mat4f:
+                    case dt_mat4ui: {
+                        u32* dstE = (u32*)dst;
+                        const u32* srcE = (u32*)(src + a.offset);
+                        for (u32 c = 0;c < a.elementCount;c++) {
+                            *(dstE++) = *(srcE++); // mat.x.x
+                            *(dstE++) = *(srcE++); // mat.x.y
+                            *(dstE++) = *(srcE++); // mat.x.z
+                            *(dstE++) = *(srcE++); // mat.x.w
+                            *(dstE++) = *(srcE++); // mat.y.x
+                            *(dstE++) = *(srcE++); // mat.y.y
+                            *(dstE++) = *(srcE++); // mat.y.z
+                            *(dstE++) = *(srcE++); // mat.y.w
+                            *(dstE++) = *(srcE++); // mat.z.x
+                            *(dstE++) = *(srcE++); // mat.z.y
+                            *(dstE++) = *(srcE++); // mat.z.z
+                            *(dstE++) = *(srcE++); // mat.z.w
+                            *(dstE++) = *(srcE++); // mat.w.x
+                            *(dstE++) = *(srcE++); // mat.w.y
+                            *(dstE++) = *(srcE++); // mat.w.z
+                            *(dstE++) = *(srcE++); // mat.w.w
+                        }
+
+                        dst += a.uniformAlignedSize;
+                        break;
+                    }
+                    case dt_struct: {
+                        dst = copyData(a.formatRef, src + a.offset, dst);
+                        break;
+                    }
+                    case dt_enum_count: break;
+                }
+            }
+
+            return dst;
         }
 
 
@@ -418,10 +390,8 @@ namespace render {
         //
 
         UniformObject::UniformObject() {
-            m_set = VK_NULL_HANDLE;
             m_buffer = nullptr;
             m_index = 0;
-            m_bindIdx = 0;
         }
 
         UniformObject::~UniformObject() {
@@ -430,13 +400,11 @@ namespace render {
         UniformBuffer* UniformObject::getBuffer() const {
             return m_buffer;
         }
-
-        u32 UniformObject::getBindIndex() const {
-            return m_bindIdx;
-        }
-
-        VkDescriptorSet UniformObject::getDescriptorSet() const {
-            return m_set;
+        
+        void UniformObject::getRange(u32* offset, u32* size) const {
+            u32 sz = m_buffer->m_paddedObjectSize;
+            if (offset) *offset = m_index * sz;
+            if (size) *size = sz;
         }
 
         void UniformObject::free() {
@@ -449,9 +417,9 @@ namespace render {
         // UniformBufferFactory
         //
 
-        UniformBufferFactory::UniformBufferFactory(LogicalDevice* device, u32 maxBufferObjectCapacity) {
+        UniformBufferFactory::UniformBufferFactory(LogicalDevice* device, u32 maxObjectsPerBuffer) {
             m_device = device;
-            m_maxBufObjCapacity = maxBufferObjectCapacity;
+            m_maxObjectsPerBuffer = maxObjectsPerBuffer;
         }
 
         UniformBufferFactory::~UniformBufferFactory() {
@@ -460,7 +428,7 @@ namespace render {
 
         void UniformBufferFactory::freeAll() {
             m_formats.clear();
-            m_buffers.each([](utils::Array<UniformBuffer*>& arr) {
+            m_buffers.each([](Array<UniformBuffer*>& arr) {
                 arr.each([](UniformBuffer* buf) {
                     delete buf;
                 });
@@ -468,13 +436,13 @@ namespace render {
             m_buffers.clear();
         }
 
-        UniformObject* UniformBufferFactory::allocate(core::DataFormat* fmt, u32 bindIndex, Pipeline* pipeline) {
+        UniformObject* UniformBufferFactory::allocate(core::DataFormat* fmt) {
             i32 idx = m_formats.findIndex([fmt](core::DataFormat* f) {
-                return (*f) == (*fmt);
+                return f->isEqualTo(fmt);
             });
 
             if (idx == -1) {
-                UniformBuffer* buf = new UniformBuffer(m_device, fmt, m_maxBufObjCapacity);
+                UniformBuffer* buf = new UniformBuffer(m_device, fmt, m_maxObjectsPerBuffer);
                 if (!buf->init()) {
                     delete buf;
                     return nullptr;
@@ -483,24 +451,24 @@ namespace render {
                 m_formats.push(fmt);
                 m_buffers.push({ buf });
 
-                return buf->allocate(bindIndex, pipeline);
+                return buf->allocate();
             }
 
-            utils::Array<UniformBuffer*>& arr = m_buffers[u32(idx)];
+            Array<UniformBuffer*>& arr = m_buffers[u32(idx)];
             UniformBuffer* buf = arr.find([](UniformBuffer* b) {
                 return b->getRemaining() > 0;
             });
 
-            if (buf) return buf->allocate(bindIndex, pipeline);
+            if (buf) return buf->allocate();
             
-            buf = new UniformBuffer(m_device, fmt, m_maxBufObjCapacity);
+            buf = new UniformBuffer(m_device, fmt, m_maxObjectsPerBuffer);
             if (!buf->init()) {
                 delete buf;
                 return nullptr;
             }
 
             arr.push(buf);
-            return buf->allocate(bindIndex, pipeline);
+            return buf->allocate();
         }
     };
 };

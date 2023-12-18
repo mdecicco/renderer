@@ -3,13 +3,22 @@
 
 #include <render/IWithRendering.h>
 #include <render/vulkan/Pipeline.h>
+#include <render/vulkan/CommandPool.h>
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/LogicalDevice.h>
 #include <render/vulkan/VertexBuffer.h>
 #include <render/vulkan/UniformBuffer.h>
+#include <render/vulkan/DescriptorSet.h>
 #include <render/vulkan/Instance.h>
 #include <render/vulkan/SwapChain.h>
+#include <render/vulkan/RenderPass.h>
+#include <render/vulkan/Texture.h>
+#include <render/vulkan/Queue.h>
+#include <render/vulkan/Framebuffer.h>
 #include <render/core/FrameContext.h>
+#include <render/core/FrameManager.h>
+#include <render/utils/SimpleDebugDraw.h>
+#include <render/utils/ImGui.h>
 
 #include <utils/Allocator.hpp>
 #include <utils/Singleton.hpp>
@@ -17,83 +26,43 @@
 #include <utils/Window.h>
 #include <utils/Timer.h>
 
+using namespace ::utils;
+using namespace render;
+using namespace vulkan;
+
 struct vertex {
-    utils::vec3f pos;
-    utils::vec3f color;
+    vec3f pos;
+    vec2f uv;
 };
 
-utils::vec3f hsv2rgb(const utils::vec3f& in)
-{
-    double      hh, p, q, t, ff;
-    long        i;
-    utils::vec3f         out;
+struct ubo {
+    mat4f projection;
+    mat4f view;
+    mat4f viewProj;
+    mat4f model;
+};
 
-    if(in.y <= 0.0) {       // < is bogus, just shuts up warnings
-        out.x = in.z;
-        out.y = in.z;
-        out.z = in.z;
-        return out;
-    }
-    hh = in.x;
-    if(hh >= 360.0) hh = 0.0;
-    hh /= 60.0;
-    i = (long)hh;
-    ff = hh - i;
-    p = in.z * (1.0 - in.y);
-    q = in.z * (1.0 - (in.y * ff));
-    t = in.z * (1.0 - (in.y * (1.0 - ff)));
-
-    switch(i) {
-    case 0:
-        out.x = in.z;
-        out.y = t;
-        out.z = p;
-        break;
-    case 1:
-        out.x = q;
-        out.y = in.z;
-        out.z = p;
-        break;
-    case 2:
-        out.x = p;
-        out.y = in.z;
-        out.z = t;
-        break;
-
-    case 3:
-        out.x = p;
-        out.y = q;
-        out.z = in.z;
-        break;
-    case 4:
-        out.x = t;
-        out.y = p;
-        out.z = in.z;
-        break;
-    case 5:
-    default:
-        out.x = in.z;
-        out.y = p;
-        out.z = q;
-        break;
-    }
-    return out;     
-}
-
-class TestApp : public render::IWithRendering {
+class TestApp : public IWithRendering {
     public:
         TestApp() {
-            m_window = new utils::Window();
+            m_window = new Window();
             m_window->setPosition(500, 500);
             m_window->setSize(256, 256);
             m_window->setTitle("Vulkan API Testing");
 
             m_pipeline = nullptr;
+            m_texture = nullptr;
         }
 
         virtual ~TestApp() {
+            if (m_texture) delete m_texture;
+            m_texture = nullptr;
+
             if (m_pipeline) delete m_pipeline;
             m_pipeline = nullptr;
+
+            if (m_renderPass) delete m_renderPass;
+            m_renderPass = nullptr;
 
             shutdownRendering();
 
@@ -101,7 +70,7 @@ class TestApp : public render::IWithRendering {
             m_window = nullptr;
         }
 
-        virtual bool setupInstance(render::vulkan::Instance* instance) {
+        virtual bool setupInstance(Instance* instance) {
             instance->enableValidation();
             instance->subscribeLogger(this);
             return true;
@@ -111,132 +80,222 @@ class TestApp : public render::IWithRendering {
             if (!m_window->setOpen(true)) return false;
             if (!initRendering(m_window)) return false;
 
-            m_pipeline = new render::vulkan::Pipeline(
+            m_renderPass = new RenderPass(getSwapChain());
+            if (!m_renderPass->init()) return false;
+
+            if (!initImGui(m_renderPass)) return false;
+            if (!initDebugDrawing(m_renderPass)) return false;
+
+            m_pipeline = new Pipeline(
                 getShaderCompiler(),
                 getLogicalDevice(),
-                getSwapChain()
+                getSwapChain(),
+                m_renderPass
             );
 
             const char* vsh =
                 "layout (location = 0) in vec3 v_pos;\n"
-                "layout (location = 1) in vec3 v_color;\n"
-                "layout (location = 0) out vec3 a_color;\n"
+                "layout (location = 1) in vec2 v_tex;\n"
                 "layout (binding = 0) uniform _ubo {\n"
-                "    mat3 model;\n"
+                "    mat4 projection;\n"
+                "    mat4 view;\n"
+                "    mat4 viewProj;\n"
+                "    mat4 model;\n"
                 "} ubo;\n"
                 "\n"
+                "layout (location = 0) out vec2 a_tex;\n"
+                "\n"
                 "void main() {\n"
-                "  gl_Position = vec4((ubo.model * v_pos) + vec3(0, 0, 0.5), 1.0);\n"
-                "  a_color = v_color;\n"
+                "  gl_Position = ubo.viewProj * ubo.model * vec4(v_pos, 1.0);\n"
+                "  a_tex = v_tex;\n"
                 "}\n"
             ;
             const char* fsh =
-                "layout (location = 0) in vec3 a_color;\n"
+                "layout (location = 0) in vec2 a_tex;\n"
+                "layout (binding = 1) uniform sampler2D s_tex;\n"
+                "\n"
                 "layout (location = 0) out vec4 o_color;\n"
                 "\n"
                 "void main() {\n"
-                "    o_color = vec4(a_color, 1.0);\n"
+                "    o_color = texture(s_tex, a_tex);\n"
                 "}\n"
             ;
             
-            m_vfmt.addAttr(render::dt_vec3f);
-            m_vfmt.addAttr(render::dt_vec3f);
+            m_vfmt.addAttr(&vertex::pos);
+            m_vfmt.addAttr(&vertex::uv);
             m_pipeline->setVertexFormat(&m_vfmt);
 
-            m_ufmt.addAttr(render::dt_mat3f);
+            m_ufmt.addAttr(&ubo::projection);
+            m_ufmt.addAttr(&ubo::view);
+            m_ufmt.addAttr(&ubo::viewProj);
+            m_ufmt.addAttr(&ubo::model);
             m_pipeline->addUniformBlock(0, &m_ufmt, VK_SHADER_STAGE_VERTEX_BIT);
+            m_pipeline->addSampler(1, VK_SHADER_STAGE_FRAGMENT_BIT);
             
             m_pipeline->addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
             m_pipeline->addDynamicState(VK_DYNAMIC_STATE_SCISSOR);
-            m_pipeline->setPrimitiveType(render::PT_TRIANGLE_FAN);
+            m_pipeline->setPrimitiveType(PT_TRIANGLE_FAN);
+            m_pipeline->setDepthTestEnabled(true);
+            m_pipeline->setDepthCompareOp(COMPARE_OP::CO_LESS_OR_EQUAL);
+            m_pipeline->setDepthWriteEnabled(true);
 
             if (!m_pipeline->setVertexShader(vsh)) return false;
             if (!m_pipeline->setFragmentShader(fsh)) return false;
             if (!m_pipeline->init()) return false;
 
+            m_texture = new Texture(getLogicalDevice());
+            if (!m_texture->init(8, 8, VK_FORMAT_R8G8B8A8_SRGB)) return false;
+            if (!m_texture->initStagingBuffer()) return false;
+            if (!m_texture->initSampler()) return false;
+
             return true;
         }
 
         void run() {
-            render::vulkan::Vertices* verts = allocateVertices(&m_vfmt, 362);
+            Vertices* verts = allocateVertices(&m_vfmt, 362);
             if (!verts) abort();
 
             if (verts->beginUpdate()) {
                 verts->at<vertex>(0) = {
-                    utils::vec3f(0.0f, 0.0f, 0.0f),
-                    utils::vec3f(0.5f, 0.5f, 0.5f)
+                    vec3f(0.0f, 0.0f, 0.0f),
+                    vec2f(0.5f, 0.5f)
                 };
-                for (utils::u32 i = 1;i <= 361;i++) {
-                    utils::f32 t = utils::radians(utils::f32(i));
+                for (u32 i = 1;i <= 361;i++) {
+                    f32 t = radians(f32(i));
                     verts->at<vertex>(i) = {
-                        utils::vec3f(cosf(t) * 0.5f, sinf(t) * 0.5f, 0.0f),
-                        hsv2rgb(utils::vec3f(utils::f32(i), 1.0f, 0.5f))
+                        vec3f(
+                            cosf(t) * 0.5f,
+                            0.0f,
+                            sinf(t) * 0.5f
+                        ),
+                        vec2f(
+                            (cosf(t) * 0.5f) + 0.5f,
+                            (sinf(t) * 0.5f) + 0.5f
+                        )
                     };
                 }
                 verts->commitUpdate();
             }
 
-            render::vulkan::UniformObject* uniforms = allocateUniformObject(&m_ufmt, 0, m_pipeline);
+            UniformObject* uniforms = allocateUniformObject(&m_ufmt);
             if (!uniforms) abort();
 
-            utils::Timer tmr;
+            DescriptorSet* set = allocateDescriptor(m_pipeline);
+            if (!set) abort();
+
+            set->add(uniforms, 0);
+            set->add(m_texture, 1);
+            set->update();
+
+            Timer tmr;
             tmr.start();
+
+            ubo u;
+            
+            CommandBuffer* buf = m_renderPass->getFrameManager()->getCommandPool()->createBuffer(true);
+            if (buf->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT)) {
+                struct pixel { u8 r, g, b, a; };
+                pixel* pixels = (pixel*)m_texture->getStagingBuffer()->getPointer();
+
+                for (u32 x = 0;x < 8;x++) {
+                    for (u32 y = 0;y < 8;y++) {
+                        u32 idx = x + (y * 8);
+                        u8 v = idx % 2 == y % 2 ? 0 : 255;
+                        pixels[idx] = {
+                            v, v, v, 255
+                        };
+                    }
+                }
+
+                m_texture->setLayout(buf, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                m_texture->flushPixels(buf);
+                m_texture->setLayout(buf, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                buf->end();
+
+                getLogicalDevice()->getGraphicsQueue()->submit(buf);
+                getLogicalDevice()->getGraphicsQueue()->waitForIdle();
+                m_texture->shutdownStagingBuffer();
+            }
+
+            auto draw = getDebugDraw();
 
             while (m_window->isOpen()) {
                 m_window->pollEvents();
 
-                auto frame = getFrame(m_pipeline);
+                auto frame = m_renderPass->getFrame();
                 frame->begin();
                 auto cb = frame->getCommandBuffer();
 
-                utils::mat4f model = utils::mat4f::Rotation(utils::vec3f(0, 0, 1), tmr);
-                
-                uniforms->set(model);
+                frame->setClearColor(0, vec4f(0.01f, 0.01f, 0.01f, 1.0f));
+                frame->setClearDepthStencil(1, 1.0f, 0);
+
+                draw->begin(frame->getSwapChainImageIndex());
+                draw->originGrid(50, 50);
+                draw->sphere(0.5f, vec3f(-1.5f, 0.0f, -0.5f));
+                draw->sphere(0.5f, vec3f(-1.5f, 0.0f,  0.5f));
+                draw->capsule(0.4f, 1.0f + sinf(tmr * 10.0f) * 0.25f, render::utils::Axis::Y_AXIS, mat4f::Translation(vec3f(-1.5f, 0.0f, 0.0f)));
+                draw->end(cb);
+
+                u.projection = draw->getProjection();
+                u.view = draw->getView();
+                u.viewProj = u.view * u.projection;
+                u.model = mat4f::Rotation(vec3f(0, 1, 0), tmr) * mat4f::Translation(vec3f(0.0f, 0.1f, 0.0f));
+                uniforms->set(u);
                 uniforms->getBuffer()->submitUpdates(cb);
 
-                cb->beginRenderPass(m_pipeline, { 0.01f, 0.01f, 0.01f, 1.0f }, frame->getSwapChainImageIndex());
+                cb->beginRenderPass(m_pipeline, frame->getFramebuffer());
+                draw->draw(cb);
+
                 cb->bindPipeline(m_pipeline, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
-                auto e = getSwapChain()->getExtent();
-                cb->setViewport(0, 0, e.width, e.height, 0, 1);
+                auto e = m_pipeline->getSwapChain()->getExtent();
+                cb->setViewport(0, e.height, e.width, -f32(e.height), 0, 1);
                 cb->setScissor(0, 0, e.width, e.height);
 
                 cb->bindVertexBuffer(verts->getBuffer());
-                cb->bindUniformObject(uniforms, VK_PIPELINE_BIND_POINT_GRAPHICS);
+                cb->bindDescriptorSet(set, VK_PIPELINE_BIND_POINT_GRAPHICS);
                 cb->draw(verts);
+
+                getImGui()->begin();
+                ImGui::ShowDemoWindow();
+                getImGui()->end(frame);
 
                 cb->endRenderPass();
                 frame->end();
 
-                getLogicalDevice()->waitForIdle();
-                releaseFrame(frame);
 
-                utils::Thread::Sleep(16);
+                // todo: find out why frame's command buffer is still pending if
+                //       waitForIdle is not called here
+                getLogicalDevice()->waitForIdle();
+                m_renderPass->releaseFrame(frame);
             }
 
             verts->free();
             uniforms->free();
+            set->free();
 
             getLogicalDevice()->waitForIdle();
         }
 
-        virtual void onLogMessage(utils::LOG_LEVEL level, const utils::String& scope, const utils::String& message) {
+        virtual void onLogMessage(LOG_LEVEL level, const String& scope, const String& message) {
             propagateLog(level, scope, message);
 
-            utils::String msg = scope + ": " + message;
+            String msg = scope + ": " + message;
             printf("%s\n", msg.c_str());
             fflush(stdout);
         }
     
     protected:
-        utils::Window* m_window;
-        render::vulkan::Pipeline* m_pipeline;
-        render::core::DataFormat m_vfmt;
-        render::core::DataFormat m_ufmt;
+        Window* m_window;
+        Pipeline* m_pipeline;
+        RenderPass* m_renderPass;
+        Texture* m_texture;
+        core::DataFormat m_vfmt;
+        core::DataFormat m_ufmt;
 };
 
 int main(int argc, char** argv) {
-    utils::Mem::Create();
+    Mem::Create();
 
     {
         TestApp app;
@@ -245,6 +304,6 @@ int main(int argc, char** argv) {
         app.run();
     }
 
-    utils::Mem::Destroy();
+    Mem::Destroy();
     return 0;
 }

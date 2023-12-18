@@ -20,49 +20,58 @@ namespace render {
         class LogicalDevice;
         class CommandBuffer;
         class Pipeline;
+        class RenderPass;
         class VertexBufferFactory;
         class Vertices;
         class UniformBufferFactory;
         class UniformObject;
+        class DescriptorFactory;
+        class DescriptorSet;
+        class Texture;
     };
 
     namespace core {
-        class FrameManager;
-        class FrameContext;
         class DataFormat;
     };
+    
+    namespace utils {
+        class SimpleDebugDraw;
+        class ImGuiContext;
+    }
 
-    class IWithRendering : public utils::IWithLogging, utils::IInputHandler {
+    class IWithRendering : public ::utils::IWithLogging, ::utils::IInputHandler {
         public:
             IWithRendering();
             virtual ~IWithRendering();
 
-            bool initRendering(utils::Window* win);
+            bool initRendering(::utils::Window* win);
+            bool initDebugDrawing(vulkan::RenderPass* pass);
+            bool initImGui(vulkan::RenderPass* pass);
             void shutdownRendering();
 
-            virtual const vulkan::PhysicalDevice* choosePhysicalDevice(const utils::Array<vulkan::PhysicalDevice>& devices);
+            virtual const vulkan::PhysicalDevice* choosePhysicalDevice(const Array<vulkan::PhysicalDevice>& devices);
             virtual bool setupInstance(vulkan::Instance* instance);
             virtual bool setupDevice(vulkan::LogicalDevice* device);
             virtual bool setupSwapchain(vulkan::SwapChain* swapChain, const vulkan::SwapChainSupport& support);
             virtual bool setupShaderCompiler(vulkan::ShaderCompiler* shaderCompiler);
-            virtual void onWindowResize(utils::Window* win, u32 width, u32 height);
+            virtual void onWindowResize(::utils::Window* win, u32 width, u32 height);
 
-            utils::Window* getWindow() const;
+            ::utils::Window* getWindow() const;
             vulkan::Instance* getInstance() const;
             vulkan::PhysicalDevice* getPhysicalDevice() const;
             vulkan::LogicalDevice* getLogicalDevice() const;
             vulkan::Surface* getSurface() const;
             vulkan::SwapChain* getSwapChain() const;
             vulkan::ShaderCompiler* getShaderCompiler() const;
-            core::FrameManager* getFrameManager() const;
+            utils::SimpleDebugDraw* getDebugDraw() const;
+            utils::ImGuiContext* getImGui() const;
 
-            core::FrameContext* getFrame(vulkan::Pipeline* pipeline) const;
-            void releaseFrame(core::FrameContext* frame);
             vulkan::Vertices* allocateVertices(core::DataFormat* format, u32 count);
-            vulkan::UniformObject* allocateUniformObject(core::DataFormat* format, u32 bindIndex, vulkan::Pipeline* pipeline);
+            vulkan::UniformObject* allocateUniformObject(core::DataFormat* format);
+            vulkan::DescriptorSet* allocateDescriptor(vulkan::Pipeline* pipeline);
         
         private:
-            utils::Window* m_window;
+            ::utils::Window* m_window;
             vulkan::Instance* m_instance;
             vulkan::PhysicalDevice* m_physicalDevice;
             vulkan::LogicalDevice* m_logicalDevice;
@@ -71,7 +80,9 @@ namespace render {
             vulkan::ShaderCompiler* m_shaderCompiler;
             vulkan::VertexBufferFactory* m_vboFactory;
             vulkan::UniformBufferFactory* m_uboFactory;
-            core::FrameManager* m_frameMgr;
+            vulkan::DescriptorFactory* m_descriptorFactory;
+            utils::SimpleDebugDraw* m_debugDraw;
+            utils::ImGuiContext* m_imgui;
 
             bool m_initialized;
     };

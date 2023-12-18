@@ -9,3 +9,14 @@ set(ENABLE_PCH              OFF CACHE BOOL "Enables Precompiled header" FORCE)
 
 add_subdirectory("./utils")
 add_subdirectory("./glslang")
+
+cmake_minimum_required(VERSION 3.15)
+project(imgui)
+
+file(GLOB IMGUI_SOURCES ./imgui/*.cpp)
+set(IMGUI_SOURCES ${IMGUI_SOURCES} ./imgui/backends/imgui_impl_vulkan.cpp)
+add_library(ImGui STATIC ${IMGUI_SOURCES})
+
+find_package(Vulkan REQUIRED)
+target_include_directories(ImGui PUBLIC ./imgui ${Vulkan_INCLUDE_DIRS})
+target_link_libraries(ImGui Vulkan::Vulkan)

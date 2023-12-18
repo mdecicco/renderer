@@ -16,11 +16,14 @@
 #include <render/vulkan/Queue.h>
 #include <render/vulkan/VertexBuffer.h>
 #include <render/vulkan/UniformBuffer.h>
+#include <render/vulkan/DescriptorSet.h>
 #include <render/core/FrameManager.h>
 #include <render/core/FrameContext.h>
+#include <render/utils/SimpleDebugDraw.h>
+#include <render/utils/ImGui.h>
 
 namespace render {
-    IWithRendering::IWithRendering() : utils::IWithLogging("Render") {
+    IWithRendering::IWithRendering() : ::utils::IWithLogging("Render") {
         m_window = nullptr;
         m_instance = nullptr;
         m_physicalDevice = nullptr;
@@ -28,9 +31,11 @@ namespace render {
         m_surface = nullptr;
         m_swapChain = nullptr;
         m_shaderCompiler = nullptr;
-        m_frameMgr = nullptr;
+        m_debugDraw = nullptr;
+        m_imgui = nullptr;
         m_vboFactory = nullptr;
         m_uboFactory = nullptr;
+        m_descriptorFactory = nullptr;
 
         m_initialized = false;
     }
@@ -41,7 +46,7 @@ namespace render {
     
 
 
-    bool IWithRendering::initRendering(utils::Window* win) {
+    bool IWithRendering::initRendering(::utils::Window* win) {
         if (m_initialized) return false;
 
         m_window = win;
@@ -125,17 +130,9 @@ namespace render {
             return false;
         }
 
-        m_frameMgr = new core::FrameManager(m_logicalDevice, 2);
-        if (!m_frameMgr->init()) {
-            fatal("Failed to initialize frame manager.");
-            shutdownRendering();
-            return false;
-        }
-
         m_vboFactory = new vulkan::VertexBufferFactory(m_logicalDevice, 8096);
         m_uboFactory = new vulkan::UniformBufferFactory(m_logicalDevice, 1024);
-
-        m_frameMgr->subscribeLogger(this);
+        m_descriptorFactory = new vulkan::DescriptorFactory(m_logicalDevice, 256);
 
         m_window->subscribe(this);
 
@@ -143,7 +140,50 @@ namespace render {
         return true;
     }
 
+    bool IWithRendering::initDebugDrawing(vulkan::RenderPass* pass) {
+        m_debugDraw = new utils::SimpleDebugDraw();
+        if (!m_debugDraw->init(m_shaderCompiler, m_swapChain, pass, m_vboFactory, m_uboFactory, m_descriptorFactory)) {
+            delete m_debugDraw;
+            return false;
+        }
+
+        m_window->subscribe(m_debugDraw);
+
+        return true;
+    }
+    
+    bool IWithRendering::initImGui(vulkan::RenderPass* pass) {
+        m_imgui = new utils::ImGuiContext(pass, m_logicalDevice->getGraphicsQueue());
+        if (!m_imgui->init()) {
+            delete m_imgui;
+            return false;
+        }
+
+        m_window->subscribe(m_imgui);
+
+        return true;
+    }
+
     void IWithRendering::shutdownRendering() {
+        if (m_imgui) {
+            m_window->unsubscribe(m_imgui);
+
+            delete m_imgui;
+            m_imgui = nullptr;
+        }
+
+        if (m_debugDraw) {
+            m_window->unsubscribe(m_debugDraw);
+            
+            delete m_debugDraw;
+            m_debugDraw = nullptr;
+        }
+
+        if (m_descriptorFactory) {
+            delete m_descriptorFactory;
+            m_descriptorFactory = nullptr;
+        }
+
         if (m_uboFactory) {
             delete m_uboFactory;
             m_uboFactory = nullptr;
@@ -152,11 +192,6 @@ namespace render {
         if (m_vboFactory) {
             delete m_vboFactory;
             m_vboFactory = nullptr;
-        }
-
-        if (m_frameMgr) {
-            delete m_frameMgr;
-            m_frameMgr = nullptr;
         }
 
         if (m_shaderCompiler) {
@@ -199,7 +234,7 @@ namespace render {
 
 
 
-    const vulkan::PhysicalDevice* IWithRendering::choosePhysicalDevice(const utils::Array<vulkan::PhysicalDevice>& devices) {
+    const vulkan::PhysicalDevice* IWithRendering::choosePhysicalDevice(const Array<vulkan::PhysicalDevice>& devices) {
         const vulkan::PhysicalDevice* gpu = nullptr;
         render::vulkan::SwapChainSupport swapChainSupport;
 
@@ -246,7 +281,7 @@ namespace render {
         return true;
     }
     
-    void IWithRendering::onWindowResize(utils::Window* win, u32 width, u32 height) {
+    void IWithRendering::onWindowResize(::utils::Window* win, u32 width, u32 height) {
         if (!m_initialized || win != m_window) return;
         log("Window resized, recreating swapchain (%dx%d)", width, height);
         m_logicalDevice->waitForIdle();
@@ -256,7 +291,7 @@ namespace render {
         }
     }
 
-    utils::Window* IWithRendering::getWindow() const {
+    ::utils::Window* IWithRendering::getWindow() const {
         return m_window;
     }
 
@@ -283,27 +318,24 @@ namespace render {
     vulkan::ShaderCompiler* IWithRendering::getShaderCompiler() const {
         return m_shaderCompiler;
     }
-
-    core::FrameManager* IWithRendering::getFrameManager() const {
-        return m_frameMgr;
+    
+    utils::SimpleDebugDraw* IWithRendering::getDebugDraw() const {
+        return m_debugDraw;
     }
-
-
-    core::FrameContext* IWithRendering::getFrame(vulkan::Pipeline* pipeline) const {
-        if (!m_initialized) return nullptr;
-
-        return m_frameMgr->getFrame(pipeline);
-    }
-
-    void IWithRendering::releaseFrame(core::FrameContext* frame) {
-        m_frameMgr->releaseFrame(frame);
+    
+    utils::ImGuiContext* IWithRendering::getImGui() const {
+        return m_imgui;
     }
 
     vulkan::Vertices* IWithRendering::allocateVertices(core::DataFormat* fmt, u32 count) {
         return m_vboFactory->allocate(fmt, count);
     }
     
-    vulkan::UniformObject* IWithRendering::allocateUniformObject(core::DataFormat* fmt, u32 bindIndex, vulkan::Pipeline* pipeline) {
-        return m_uboFactory->allocate(fmt, bindIndex, pipeline);
+    vulkan::UniformObject* IWithRendering::allocateUniformObject(core::DataFormat* fmt) {
+        return m_uboFactory->allocate(fmt);
+    }
+    
+    vulkan::DescriptorSet* IWithRendering::allocateDescriptor(vulkan::Pipeline* pipeline) {
+        return m_descriptorFactory->allocate(pipeline);
     }
 };

@@ -5,8 +5,10 @@
 #include <render/vulkan/QueueFamily.h>
 #include <render/vulkan/Pipeline.h>
 #include <render/vulkan/SwapChain.h>
+#include <render/vulkan/RenderPass.h>
 #include <render/vulkan/VertexBuffer.h>
-#include <render/vulkan/UniformBuffer.h>
+#include <render/vulkan/DescriptorSet.h>
+#include <render/vulkan/Framebuffer.h>
 
 #include <utils/Array.hpp>
 
@@ -72,18 +74,24 @@ namespace render {
             return vkResetCommandBuffer(m_buffer, 0) == VK_SUCCESS;
         }
 
-        void CommandBuffer::beginRenderPass(Pipeline* pipeline, const VkClearValue& clearColor, u32 imageIdx) {
+        void CommandBuffer::beginRenderPass(Pipeline* pipeline, Framebuffer* target) {
             if (!m_buffer || !m_isRecording) return;
+
+            VkClearValue clearValues[16] = {};
+            auto& attachments = target->getAttachments();
+            for (u32 i = 0;i < attachments.size();i++) {
+                clearValues[i] = attachments[i].clearValue;
+            }
 
             VkRenderPassBeginInfo rpi = {};
             rpi.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            rpi.renderPass = pipeline->getRenderPass();
-            rpi.framebuffer = pipeline->getFramebuffers()[imageIdx];
+            rpi.renderPass = pipeline->getRenderPass()->get();
+            rpi.framebuffer = target->get();
             rpi.renderArea.offset.x = 0;
             rpi.renderArea.offset.y = 0;
             rpi.renderArea.extent = pipeline->getSwapChain()->getExtent();
-            rpi.clearValueCount = 1;
-            rpi.pClearValues = &clearColor;
+            rpi.clearValueCount = attachments.size();
+            rpi.pClearValues = clearValues;
 
             vkCmdBeginRenderPass(
                 m_buffer,
@@ -106,10 +114,10 @@ namespace render {
             m_boundPipeline = pipeline;
         }
         
-        void CommandBuffer::bindUniformObject(UniformObject* uo, VkPipelineBindPoint bindPoint) {
+        void CommandBuffer::bindDescriptorSet(DescriptorSet* set, VkPipelineBindPoint bindPoint) {
             if (!m_buffer || !m_isRecording) return;
-            VkDescriptorSet set = uo->getDescriptorSet();
-            vkCmdBindDescriptorSets(m_buffer, bindPoint, m_boundPipeline->getLayout(), 0, 1, &set, 0, nullptr);
+            VkDescriptorSet s = set->get();
+            vkCmdBindDescriptorSets(m_buffer, bindPoint, m_boundPipeline->getLayout(), 0, 1, &s, 0, nullptr);
         }
         
         void CommandBuffer::bindVertexBuffer(VertexBuffer* vbo) {

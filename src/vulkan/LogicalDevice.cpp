@@ -80,13 +80,14 @@ namespace render {
             u32 queueCount = buildQueueInfo(families, queueInfo, needsGraphics, needsCompute, needsTransfer, surface, &surfaceInfoIdx, &gfxInfoIdx);
             if (queueCount == 0) return false;
 
-            VkPhysicalDeviceFeatures deviceFeatures = {};
+            VkPhysicalDeviceFeatures df = {};
+            df.samplerAnisotropy = VK_TRUE;
 
             VkDeviceCreateInfo di = {};
             di.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
             di.pQueueCreateInfos = queueInfo;
             di.queueCreateInfoCount = queueCount;
-            di.pEnabledFeatures = &deviceFeatures;
+            di.pEnabledFeatures = &df;
             di.enabledExtensionCount = m_enabledExtensions.size();
             di.ppEnabledExtensionNames = m_enabledExtensions.data();
             di.enabledLayerCount = m_enabledLayers.size();
@@ -145,7 +146,7 @@ namespace render {
             return m_physicalDevice->getInstance();
         }
         
-        const utils::Array<Queue*>& LogicalDevice::getQueues() const {
+        const Array<Queue*>& LogicalDevice::getQueues() const {
             return m_queues;
         }
         
@@ -158,7 +159,7 @@ namespace render {
         }
 
         u32 LogicalDevice::buildQueueInfo(
-            utils::Array<QueueFamily>& families,
+            Array<QueueFamily>& families,
             VkDeviceQueueCreateInfo* infos,
             bool needsGraphics,
             bool needsCompute,

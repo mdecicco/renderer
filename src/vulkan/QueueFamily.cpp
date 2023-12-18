@@ -50,7 +50,7 @@ namespace render {
             return m_index;
         }
 
-        utils::Array<QueueFamily> QueueFamily::list(PhysicalDevice* device) {
+        Array<QueueFamily> QueueFamily::list(PhysicalDevice* device) {
             u32 count = 0;
             vkGetPhysicalDeviceQueueFamilyProperties(device->get(), &count, nullptr);
 
@@ -58,7 +58,7 @@ namespace render {
             VkQueueFamilyProperties* families = new VkQueueFamilyProperties[count];
             vkGetPhysicalDeviceQueueFamilyProperties(device->get(), &count, families);
 
-            utils::Array<QueueFamily> out(count);
+            Array<QueueFamily> out(count);
             for (u32 i = 0;i < count;i++) {
                 out.emplace();
                 QueueFamily& fam = out.last();

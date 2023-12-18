@@ -1,5 +1,6 @@
 #pragma once
 #include <render/types.h>
+#include <render/vulkan/Buffer.h>
 
 #include <utils/Array.h>
 #include <vulkan/vulkan.h>
@@ -49,14 +50,12 @@ namespace render {
                 void insertToFreeList(node* n);
 
                 LogicalDevice* m_device;
+                Buffer m_buffer;
                 core::DataFormat* m_fmt;
                 u32 m_capacity;
                 u32 m_currentMaximumBlockSize;
                 u32 m_nodeCount;
                 u32 m_memoryMapRefCount;
-
-                VkBuffer m_buffer;
-                VkDeviceMemory m_memory;
 
                 node* m_freeBlocks;
                 node* m_usedBlocks;
@@ -73,14 +72,13 @@ namespace render {
                 VertexBuffer* getBuffer() const;
                 void free();
 
-                bool beginUpdate(bool willReadData = false);
-                
-                void write(void* data, u32 offset, u32 count);
+                bool beginUpdate();
+                bool write(void* data, u32 offset, u32 count);
                 
                 // will dereference null pointer if beginUpdate is not called or
                 // if a beginUpdate failure is ignored
                 template <typename VertexTp>
-                VertexTp& at(u32 idx) { return ((VertexTp*)m_mappedMemory)[idx]; }
+                VertexTp& at(u32 idx) { return ((VertexTp*)m_buffer->m_buffer.getPointer())[idx]; }
 
                 bool commitUpdate();
 
@@ -93,13 +91,11 @@ namespace render {
                 VertexBuffer* m_buffer;
                 core::DataFormat* m_fmt;
                 VertexBuffer::node* m_node;
-                VkMappedMemoryRange m_range;
-                void* m_mappedMemory;
         };
 
         class VertexBufferFactory {
             public:
-                VertexBufferFactory(LogicalDevice* device, u32 maxBufferCapacity);
+                VertexBufferFactory(LogicalDevice* device, u32 minBufferCapacity);
                 ~VertexBufferFactory();
 
                 void freeAll();
@@ -108,10 +104,10 @@ namespace render {
             
             private:
                 LogicalDevice* m_device;
-                u32 m_maxBufCapacity;
+                u32 m_minBufferCapacity;
 
-                utils::Array<core::DataFormat*> m_formats;
-                utils::Array<utils::Array<VertexBuffer*>> m_buffers;
+                Array<core::DataFormat*> m_formats;
+                Array<Array<VertexBuffer*>> m_buffers;
         };
     };
 };

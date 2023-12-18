@@ -1,5 +1,9 @@
 #pragma once
 #include <stdint.h>
+#include <utils/Math.hpp>
+
+#include <utils/Array.h>
+#include <utils/String.h>
 
 namespace render {
     typedef uint64_t    u64;
@@ -12,6 +16,29 @@ namespace render {
     typedef int8_t      i8;
     typedef float       f32;
     typedef double      f64;
+
+    using vec2i = ::utils::vec2<i32>;
+    using vec2ui = ::utils::vec2<u32>;
+    using vec2f = ::utils::vec2<f32>;
+    using vec2d = ::utils::vec2<f64>;
+    using vec3i = ::utils::vec3<i32>;
+    using vec3ui = ::utils::vec3<u32>;
+    using vec3f = ::utils::vec3<f32>;
+    using vec3d = ::utils::vec3<f64>;
+    using vec4i = ::utils::vec4<i32>;
+    using vec4ui = ::utils::vec4<u32>;
+    using vec4f = ::utils::vec4<f32>;
+    using vec4d = ::utils::vec4<f64>;
+    using quatf = ::utils::quat<f32>;
+    using quatd = ::utils::quat<f64>;
+    using mat2f = ::utils::mat2<f32>;
+    using mat2d = ::utils::mat2<f64>;
+    using mat3f = ::utils::mat3<f32>;
+    using mat3d = ::utils::mat3<f64>;
+    using mat4f = ::utils::mat4<f32>;
+    using mat4d = ::utils::mat4<f64>;
+    using String = ::utils::String;
+    template <typename T> using Array = ::utils::Array<T>;
 
     enum DATA_TYPE {
         dt_int = 0,
@@ -35,6 +62,7 @@ namespace render {
         dt_mat4i,
         dt_mat4f,
         dt_mat4ui,
+        dt_struct,
         dt_enum_count
     };
 

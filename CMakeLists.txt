@@ -26,9 +26,10 @@ macro(add_sources group dir)
     unset(_all)
 endmacro(add_sources)
 
-add_sources("src"           ".")
-add_sources("src"           "vulkan")
-add_sources("src"           "core")
+add_sources("src" ".")
+add_sources("src" "vulkan")
+add_sources("src" "core")
+add_sources("src" "utils")
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory("./deps")
@@ -44,6 +45,7 @@ target_include_directories(render PUBLIC
     ${Vulkan_INCLUDE_DIRS}
     ./deps/utils/include
     ./deps/glslang
+    ./deps/imgui
 )
 
 SET(debug_libs
@@ -51,6 +53,7 @@ SET(debug_libs
     glslang
     SPIRV
     glslang-default-resource-limits
+    ImGui
 )
 
 SET(release_libs
@@ -58,6 +61,7 @@ SET(release_libs
     glslang
     SPIRV
     glslang-default-resource-limits
+    ImGui
 )
 
 target_link_libraries(render ${debug_libs})

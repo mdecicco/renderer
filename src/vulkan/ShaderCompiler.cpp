@@ -134,7 +134,7 @@ namespace render {
             m_isInitialized = false;
         }
         
-        glslang::TShader* ShaderCompiler::compileShader(const utils::String& source, EShLanguage type) {
+        glslang::TShader* ShaderCompiler::compileShader(const String& source, EShLanguage type) {
             TBuiltInResource resources = DefaultResources();
             EShMessages messageFlags = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
 
@@ -159,7 +159,7 @@ namespace render {
             );
 
             if (!preprocessSuccess) {
-                error(utils::String(shdr->getInfoLog()));
+                error(String(shdr->getInfoLog()));
                 delete shdr;
                 return nullptr;
             }
@@ -169,7 +169,7 @@ namespace render {
 
             bool parseSuccess = shdr->parse(&resources, 450, false, messageFlags);
             if (!parseSuccess) {
-                error(utils::String(shdr->getInfoLog()));
+                error(String(shdr->getInfoLog()));
                 delete shdr;
                 return nullptr;
             }

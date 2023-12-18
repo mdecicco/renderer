@@ -1,7 +1,7 @@
 #pragma once
 #include <render/types.h>
+#include <render/vulkan/Buffer.h>
 
-#include <utils/Array.h>
 #include <vulkan/vulkan.h>
 
 namespace render {
@@ -13,7 +13,6 @@ namespace render {
         class LogicalDevice;
         class UniformObject;
         class CommandBuffer;
-        class Pipeline;
 
         class UniformBuffer {
             public:
@@ -30,7 +29,7 @@ namespace render {
                 u32 getCapacity() const;
                 u32 getRemaining() const;
 
-                UniformObject* allocate(u32 bindIndex, Pipeline* pipeline);
+                UniformObject* allocate();
                 void free(UniformObject* data);
 
                 void submitUpdates(CommandBuffer* cb);
@@ -41,17 +40,16 @@ namespace render {
                 void resetNodes();
                 void insertToFreeList(UniformObject* n);
                 void updateObject(UniformObject* n, const void* data);
+                u8* copyData(const core::DataFormat* fmt, const u8* src, u8* dst);
 
                 LogicalDevice* m_device;
                 core::DataFormat* m_fmt;
                 u32 m_capacity;
                 u32 m_usedCount;
-
-                VkDescriptorPool m_pool;
-                VkBuffer m_buffer;
-                VkDeviceMemory m_memory;
-                VkBuffer m_stagingBuffer;
-                VkDeviceMemory m_stagingMemory;
+                u32 m_paddedObjectSize;
+                
+                Buffer m_buffer;
+                Buffer m_stagingBuffer;
 
                 UniformObject* m_free;
                 UniformObject* m_used;
@@ -61,14 +59,13 @@ namespace render {
                 bool m_hasUpdates;
                 u32 m_minUpdateIdx;
                 u32 m_maxUpdateIdx;
-                utils::Array<VkBufferCopy> m_copyRanges;
+                Array<VkBufferCopy> m_copyRanges;
         };
 
         class UniformObject {
             public:
                 UniformBuffer* getBuffer() const;
-                u32 getBindIndex() const;
-                VkDescriptorSet getDescriptorSet() const;
+                void getRange(u32* offset, u32* size) const;
                 void free();
 
                 template <typename ObjectTp>
@@ -80,8 +77,6 @@ namespace render {
                 UniformObject();
                 ~UniformObject();
 
-                u32 m_bindIdx;
-                VkDescriptorSet m_set;
                 UniformBuffer* m_buffer;
                 u32 m_index;
                 UniformObject* m_last;
@@ -90,19 +85,19 @@ namespace render {
 
         class UniformBufferFactory {
             public:
-                UniformBufferFactory(LogicalDevice* device, u32 maxBufferObjectCapacity);
+                UniformBufferFactory(LogicalDevice* device, u32 maxObjectsPerBuffer);
                 ~UniformBufferFactory();
 
                 void freeAll();
 
-                UniformObject* allocate(core::DataFormat* fmt, u32 bindIndex, Pipeline* pipeline);
+                UniformObject* allocate(core::DataFormat* fmt);
             
             private:
                 LogicalDevice* m_device;
-                u32 m_maxBufObjCapacity;
+                u32 m_maxObjectsPerBuffer;
 
-                utils::Array<core::DataFormat*> m_formats;
-                utils::Array<utils::Array<UniformBuffer*>> m_buffers;
+                Array<core::DataFormat*> m_formats;
+                Array<Array<UniformBuffer*>> m_buffers;
         };
     };
 };

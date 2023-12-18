@@ -9,26 +9,35 @@ namespace render {
         class LogicalDevice;
         class CommandPool;
         class CommandBuffer;
-        class Pipeline;
+        class SwapChain;
+        class RenderPass;
+        class Framebuffer;
     };
 
     namespace core {
         class FrameContext;
 
-        class FrameManager : public utils::IWithLogging {
+        class FrameManager : public ::utils::IWithLogging {
             public:
-                FrameManager(vulkan::LogicalDevice* device, u32 maxLiveFrames);
+                FrameManager(vulkan::RenderPass* renderPass, u32 maxLiveFrames);
                 ~FrameManager();
+
+                vulkan::CommandPool* getCommandPool() const;
 
                 bool init();
                 void shutdown();
 
-                FrameContext* getFrame(vulkan::Pipeline* pipeline);
+                FrameContext* getFrame();
                 void releaseFrame(FrameContext* frame);
 
-            protected:
+            private:
+                friend class FrameContext;
+
+                vulkan::RenderPass* m_renderPass;
+                vulkan::SwapChain* m_swapChain;
                 vulkan::LogicalDevice* m_device;
                 vulkan::CommandPool* m_cmdPool;
+                Array<vulkan::Framebuffer*> m_framebuffers;
 
                 struct FrameNode {
                     FrameContext* frame;

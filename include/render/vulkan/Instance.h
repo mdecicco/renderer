@@ -12,15 +12,15 @@ namespace utils {
 
 namespace render {
     namespace vulkan {
-        class Instance : public utils::IWithLogging {
+        class Instance : public ::utils::IWithLogging {
             public:
                 Instance();
                 ~Instance();
 
                 void enableValidation();
-                void setApplicationName(const utils::String& name);
+                void setApplicationName(const String& name);
                 void setApplicationVersion(u32 major, u32 minor, u32 patch);
-                void setEngineName(const utils::String& name);
+                void setEngineName(const String& name);
                 void setEngineVersion(u32 major, u32 minor, u32 patch);
                 bool enableExtension(const char* name);
                 bool enableLayer(const char* name);
@@ -51,14 +51,14 @@ namespace render {
 
                 bool m_validationEnabled;
                 bool m_canInterceptLogs;
-                utils::String m_applicationName;
-                utils::String m_engineName;
+                String m_applicationName;
+                String m_engineName;
                 u32 m_applicationVersion;
                 u32 m_engineVersion;
-                utils::Array<VkExtensionProperties> m_availableExtensions;
-                utils::Array<VkLayerProperties> m_availableLayers;
-                utils::Array<const char*> m_enabledExtensions;
-                utils::Array<const char*> m_enabledLayers;
+                Array<VkExtensionProperties> m_availableExtensions;
+                Array<VkLayerProperties> m_availableLayers;
+                Array<const char*> m_enabledExtensions;
+                Array<const char*> m_enabledLayers;
         };
     };
 };

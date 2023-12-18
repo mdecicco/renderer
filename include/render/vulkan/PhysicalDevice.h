@@ -1,7 +1,6 @@
 #pragma once
 #include <render/types.h>
 
-#include <utils/Array.h>
 #include <vulkan/vulkan.h>
 
 namespace render {
@@ -15,7 +14,7 @@ namespace render {
             public:
                 PhysicalDevice(const PhysicalDevice& dev);
                 ~PhysicalDevice();
-                static utils::Array<PhysicalDevice> list(Instance* instance);
+                static Array<PhysicalDevice> list(Instance* instance);
 
                 bool isDiscrete() const;
                 bool isVirtual() const;
@@ -26,6 +25,7 @@ namespace render {
                 
                 bool canPresentToSurface(Surface* surface, const QueueFamily& queueFamily) const;
                 bool getSurfaceSwapChainSupport(Surface* surface, SwapChainSupport* out) const;
+                bool getMemoryTypeIndex(const VkMemoryRequirements& reqs, VkMemoryPropertyFlags flags, u32* dst) const;
 
                 VkPhysicalDevice get() const;
                 const VkPhysicalDeviceProperties& getProperties() const;
@@ -34,7 +34,7 @@ namespace render {
                 Instance* getInstance() const;
 
             protected:
-                friend class utils::Array<PhysicalDevice>;
+                friend class ::utils::Array<PhysicalDevice>;
                 PhysicalDevice();
 
                 Instance* m_instance;
@@ -42,8 +42,8 @@ namespace render {
                 VkPhysicalDeviceProperties m_props;
                 VkPhysicalDeviceFeatures m_features;
                 VkPhysicalDeviceMemoryProperties m_memoryProps;
-                utils::Array<VkExtensionProperties> m_availableExtensions;
-                utils::Array<VkLayerProperties> m_availableLayers;
+                Array<VkExtensionProperties> m_availableExtensions;
+                Array<VkLayerProperties> m_availableLayers;
         };
     };
 };

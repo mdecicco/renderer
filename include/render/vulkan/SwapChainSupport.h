@@ -25,8 +25,8 @@ namespace render {
                 const PhysicalDevice* m_device;
                 const Surface* m_surface;
                 VkSurfaceCapabilitiesKHR m_capabilities;
-                utils::Array<VkSurfaceFormatKHR> m_formats;
-                utils::Array<VkPresentModeKHR> m_presentModes;
+                Array<VkSurfaceFormatKHR> m_formats;
+                Array<VkPresentModeKHR> m_presentModes;
         };
     };
 };

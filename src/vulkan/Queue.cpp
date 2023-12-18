@@ -1,6 +1,7 @@
 #include <render/vulkan/Queue.h>
 #include <render/vulkan/QueueFamily.h>
 #include <render/vulkan/LogicalDevice.h>
+#include <render/vulkan/CommandBuffer.h>
 
 namespace render {
     namespace vulkan {
@@ -40,6 +41,37 @@ namespace render {
 
         bool Queue::supportsTransfer() const {
             return m_family.supportsTransfer();
+        }
+
+        bool Queue::submit(
+            CommandBuffer* buffer,
+            VkFence fence,
+            u32 waitForCount,
+            VkSemaphore* waitFor,
+            u32 signalCount,
+            VkSemaphore* signal,
+            VkPipelineStageFlags waitStageMask
+        ) const {
+            VkCommandBuffer cb = buffer->get();
+
+            VkSubmitInfo si = {};
+            si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            si.commandBufferCount = 1;
+            si.pCommandBuffers = &cb;
+            si.waitSemaphoreCount = waitForCount;
+            si.pWaitSemaphores = waitFor;
+            si.signalSemaphoreCount = signalCount;
+            si.pSignalSemaphores = signal;
+
+            if (waitStageMask != VK_PIPELINE_STAGE_NONE) {
+                si.pWaitDstStageMask = &waitStageMask;
+            }
+
+            return vkQueueSubmit(m_queue, 1, &si, fence) == VK_SUCCESS;
+        }
+        
+        bool Queue::waitForIdle() const {
+            return vkQueueWaitIdle(m_queue) == VK_SUCCESS;
         }
     };
 };

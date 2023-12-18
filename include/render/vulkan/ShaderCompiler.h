@@ -7,7 +7,7 @@
 
 namespace render {
     namespace vulkan {
-        class ShaderCompiler : public utils::IWithLogging  {
+        class ShaderCompiler : public ::utils::IWithLogging  {
             public:
                 ShaderCompiler();
                 ~ShaderCompiler();
@@ -15,7 +15,7 @@ namespace render {
                 bool init();
                 void shutdown();
 
-                glslang::TShader* compileShader(const utils::String& source, EShLanguage type);
+                glslang::TShader* compileShader(const String& source, EShLanguage type);
             
             protected:
                 bool m_isInitialized;

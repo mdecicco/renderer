@@ -7,6 +7,8 @@
 #include <render/vulkan/QueueFamily.h>
 #include <render/vulkan/Instance.h>
 #include <render/vulkan/Pipeline.h>
+#include <render/vulkan/RenderPass.h>
+#include <render/vulkan/Texture.h>
 
 #include <utils/Window.h>
 #include <utils/Array.hpp>
@@ -28,16 +30,24 @@ namespace render {
             return m_swapChain;
         }
 
+        LogicalDevice* SwapChain::getDevice() const {
+            return m_device;
+        }
+
         bool SwapChain::isValid() const {
             return m_swapChain != nullptr;
         }
         
-        const utils::Array<VkImage>& SwapChain::getImages() const {
+        const Array<VkImage>& SwapChain::getImages() const {
             return m_images;
         }
         
-        const utils::Array<VkImageView>& SwapChain::getImageViews() const {
+        const Array<VkImageView>& SwapChain::getImageViews() const {
             return m_imageViews;
+        }
+        
+        const Array<Texture*>& SwapChain::getDepthBuffers() const {
+            return m_depthBuffers;
         }
         
         const VkExtent2D& SwapChain::getExtent() const {
@@ -128,6 +138,7 @@ namespace render {
             }
 
             m_imageViews.reserve(count);
+            m_depthBuffers.reserve(count);
             for (u32 i = 0;i < count;i++) {
                 VkImageViewCreateInfo iv = {};
                 iv.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -150,6 +161,25 @@ namespace render {
                     return false;
                 }
                 m_imageViews.push(view);
+
+                Texture* depth = new Texture(m_device);
+                bool r = depth->init(
+                    m_extent.width,
+                    m_extent.height,
+                    VK_FORMAT_D32_SFLOAT,
+                    VK_IMAGE_TYPE_2D,
+                    1, 1, 1,
+                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                    VK_IMAGE_LAYOUT_UNDEFINED
+                );
+
+                if (!r) {
+                    delete depth;
+                    shutdown();
+                    return false;
+                }
+
+                m_depthBuffers.push(depth);
             }
 
             m_format = format;
@@ -160,10 +190,7 @@ namespace render {
         bool SwapChain::recreate() {
             if (!m_swapChain) return false;
 
-            // Destroy old image views
-            for (u32 i = 0;i < m_imageViews.size();i++) {
-                vkDestroyImageView(m_device->get(), m_imageViews[i], m_device->getInstance()->getAllocator());
-            }
+            auto prevViews = m_imageViews;
             m_imageViews.clear();
             m_images.clear();
 
@@ -244,14 +271,44 @@ namespace render {
                     return false;
                 }
                 m_imageViews.push(view);
+
+                // reuse old depth buffer Texture objects
+                m_depthBuffers[i]->shutdown();
+                bool r = m_depthBuffers[i]->init(
+                    m_extent.width,
+                    m_extent.height,
+                    VK_FORMAT_D32_SFLOAT,
+                    VK_IMAGE_TYPE_2D,
+                    1, 1, 1,
+                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                    VK_IMAGE_LAYOUT_UNDEFINED
+                );
+
+                if (!r) {
+                    shutdown();
+                    return false;
+                }
+            }
+
+            // Destroy old image views
+            for (u32 i = 0;i < prevViews.size();i++) {
+                vkDestroyImageView(m_device->get(), prevViews[i], m_device->getInstance()->getAllocator());
             }
 
             // Destroy old swapchain
             vkDestroySwapchainKHR(m_device->get(), m_swapChain, m_device->getInstance()->getAllocator());
 
-            // Update pipelines
             m_swapChain = newSwapChain;
             
+            // Update render passes
+            for (u32 i = 0;i < m_renderPasses.size();i++) {
+                if (!m_renderPasses[i]->recreate()) {
+                    shutdown();
+                    return false;
+                }
+            }
+            
+            // Update pipelines
             for (u32 i = 0;i < m_pipelines.size();i++) {
                 if (!m_pipelines[i]->recreate()) {
                     shutdown();
@@ -269,12 +326,17 @@ namespace render {
                 vkDestroyImageView(m_device->get(), m_imageViews[i], m_device->getInstance()->getAllocator());
             }
 
+            for (u32 i = 0;i < m_depthBuffers.size();i++) {
+                delete m_depthBuffers[i];
+            }
+
             vkDestroySwapchainKHR(m_device->get(), m_swapChain, m_device->getInstance()->getAllocator());
             m_swapChain = VK_NULL_HANDLE;
             m_device = nullptr;
             m_surface = nullptr;
             m_imageViews.clear();
             m_images.clear();
+            m_depthBuffers.clear();
             m_format = VK_FORMAT_UNDEFINED;
             m_createInfo = {};
         }
@@ -289,6 +351,18 @@ namespace render {
             });
             if (idx == -1) return;
             m_pipelines.remove(u32(idx));
+        }
+        
+        void SwapChain::onRenderPassCreated(RenderPass* pass) {
+            m_renderPasses.push(pass);
+        }
+
+        void SwapChain::onRenderPassDestroyed(RenderPass* pass) {
+            i64 idx = m_renderPasses.findIndex([pass](RenderPass* p) {
+                return p == pass;
+            });
+            if (idx == -1) return;
+            m_renderPasses.remove(u32(idx));
         }
     };
 };

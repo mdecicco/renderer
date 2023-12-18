@@ -30,13 +30,13 @@ namespace render {
                 VkDevice get() const;
                 PhysicalDevice* getPhysicalDevice() const;
                 Instance* getInstance() const;
-                const utils::Array<Queue*>& getQueues() const;
+                const Array<Queue*>& getQueues() const;
                 const Queue* getPresentationQueue() const;
                 const Queue* getGraphicsQueue() const;
             
             protected:
                 u32 buildQueueInfo(
-                    utils::Array<QueueFamily>& families,
+                    Array<QueueFamily>& families,
                     VkDeviceQueueCreateInfo* infos,
                     bool needsGraphics,
                     bool needsCompute,
@@ -49,9 +49,9 @@ namespace render {
                 bool m_isInitialized;
                 VkDevice m_device;
                 PhysicalDevice* m_physicalDevice;
-                utils::Array<const char*> m_enabledExtensions;
-                utils::Array<const char*> m_enabledLayers;
-                utils::Array<Queue*> m_queues;
+                Array<const char*> m_enabledExtensions;
+                Array<const char*> m_enabledLayers;
+                Array<Queue*> m_queues;
                 Queue* m_presentQueue;
                 Queue* m_gfxQueue;
         };

@@ -29,7 +29,7 @@ namespace render {
                 const QueueFamily* m_family;
                 VkCommandPool m_pool;
                 VkCommandPoolCreateFlags m_flags;
-                utils::Array<CommandBuffer*> m_buffers;
+                Array<CommandBuffer*> m_buffers;
         };
     };
 };

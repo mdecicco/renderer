@@ -13,20 +13,22 @@ namespace render {
         class ShaderCompiler;
         class LogicalDevice;
         class SwapChain;
+        class RenderPass;
 
-        class Pipeline : public utils::IWithLogging {
+        class Pipeline : public ::utils::IWithLogging {
             public:
-                Pipeline(ShaderCompiler* compiler, LogicalDevice* device, SwapChain* swapChain);
+                Pipeline(ShaderCompiler* compiler, LogicalDevice* device, SwapChain* swapChain, RenderPass* render);
                 ~Pipeline();
 
                 void reset();
 
+                void addSampler(u32 bindIndex, VkShaderStageFlagBits stages);
                 void addUniformBlock(u32 bindIndex, const core::DataFormat* fmt, VkShaderStageFlagBits stages);
                 void setVertexFormat(const core::DataFormat* fmt);
-                bool setVertexShader(const utils::String& source);
-                bool setFragmentShader(const utils::String& source);
-                bool setGeometryShader(const utils::String& source);
-                bool setComputeShader(const utils::String& source);
+                bool setVertexShader(const String& source);
+                bool setFragmentShader(const String& source);
+                bool setGeometryShader(const String& source);
+                bool setComputeShader(const String& source);
                 void addDynamicState(VkDynamicState state);
 
                 void setViewport(f32 x, f32 y, f32 w, f32 h, f32 minZ, f32 maxZ);
@@ -57,16 +59,15 @@ namespace render {
 
                 VkPipeline get() const;
                 VkPipelineLayout getLayout() const;
-                VkRenderPass getRenderPass() const;
+                RenderPass* getRenderPass() const;
                 SwapChain* getSwapChain() const;
                 VkDescriptorSetLayout getDescriptorSetLayout() const;
-                const utils::Array<VkFramebuffer>& getFramebuffers() const;
 
             protected:
                 bool processShader(
                     glslang::TProgram& prog,
                     EShLanguage lang,
-                    utils::Array<VkPipelineShaderStageCreateInfo>& stages
+                    Array<VkPipelineShaderStageCreateInfo>& stages
                 );
 
                 struct uniform_block {
@@ -75,30 +76,35 @@ namespace render {
                     const core::DataFormat* format;
                 };
 
+                struct sampler_info {
+                    u32 binding;
+                    VkShaderStageFlagBits stages;
+                };
+
                 ShaderCompiler* m_compiler;
                 LogicalDevice* m_device;
                 SwapChain* m_swapChain;
+                RenderPass* m_renderPass;
                 VkPipelineLayout m_layout;
-                VkRenderPass m_renderPass;
                 VkDescriptorSetLayout m_descriptorSetLayout;
                 VkPipeline m_pipeline;
                 const core::DataFormat* m_vertexFormat;
-                utils::Array<uniform_block> m_uniformBlocks;
+                Array<uniform_block> m_uniformBlocks;
+                Array<sampler_info> m_samplers;
                 bool m_isInitialized;
                 bool m_scissorIsSet;
 
-                utils::String m_vertexShaderSrc;
+                String m_vertexShaderSrc;
                 glslang::TShader* m_vertexShader;
-                utils::String m_fragShaderSrc;
+                String m_fragShaderSrc;
                 glslang::TShader* m_fragShader;
-                utils::String m_geomShaderSrc;
+                String m_geomShaderSrc;
                 glslang::TShader* m_geomShader;
-                utils::String m_computeShaderSrc;
+                String m_computeShaderSrc;
                 glslang::TShader* m_computeShader;
 
-                utils::Array<VkShaderModule> m_shaderModules;
-                utils::Array<VkDynamicState> m_dynamicState;
-                utils::Array<VkFramebuffer> m_framebuffers;
+                Array<VkShaderModule> m_shaderModules;
+                Array<VkDynamicState> m_dynamicState;
 
                 // state
                 VkViewport m_viewport;
