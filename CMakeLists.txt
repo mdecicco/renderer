@@ -34,6 +34,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory("./deps")
 add_subdirectory("./test")
+add_subdirectory("./dvd")
 
 add_library(render ${all_sources})
 
@@ -48,7 +49,7 @@ target_include_directories(render PUBLIC
     ./deps/imgui
 )
 
-SET(debug_libs
+SET(libs
     Vulkan::Vulkan
     glslang
     SPIRV
@@ -56,16 +57,7 @@ SET(debug_libs
     ImGui
 )
 
-SET(release_libs
-    Vulkan::Vulkan
-    glslang
-    SPIRV
-    glslang-default-resource-limits
-    ImGui
-)
-
-target_link_libraries(render ${debug_libs})
-#target_link_libraries(render ${release_libs})
+target_link_libraries(render ${libs})
 
 set_property(TARGET render PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}")
 
