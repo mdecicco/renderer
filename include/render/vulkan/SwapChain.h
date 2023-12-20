@@ -20,6 +20,7 @@ namespace render {
                 VkSwapchainKHR get() const;
                 LogicalDevice* getDevice() const;
                 bool isValid() const;
+                u32 getImageCount() const;
                 const Array<VkImage>& getImages() const;
                 const Array<VkImageView>& getImageViews() const;
                 const Array<Texture*>& getDepthBuffers() const;
@@ -47,8 +48,6 @@ namespace render {
                 
                 void onPipelineCreated(Pipeline* pipeline);
                 void onPipelineDestroyed(Pipeline* pipeline);
-                void onRenderPassCreated(RenderPass* pass);
-                void onRenderPassDestroyed(RenderPass* pass);
 
                 Surface* m_surface;
                 LogicalDevice* m_device;
@@ -60,7 +59,6 @@ namespace render {
                 Array<VkImageView> m_imageViews;
                 Array<Texture*> m_depthBuffers;
                 Array<Pipeline*> m_pipelines;
-                Array<RenderPass*> m_renderPasses;
         };
     };
 };

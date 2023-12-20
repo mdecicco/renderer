@@ -12,6 +12,7 @@
 #include <render/vulkan/SwapChain.h>
 #include <render/vulkan/ShaderCompiler.h>
 #include <render/vulkan/Pipeline.h>
+#include <render/vulkan/RenderPass.h>
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/Queue.h>
 #include <render/vulkan/VertexBuffer.h>
@@ -33,6 +34,7 @@ namespace render {
         m_shaderCompiler = nullptr;
         m_debugDraw = nullptr;
         m_imgui = nullptr;
+        m_frames = nullptr;
         m_vboFactory = nullptr;
         m_uboFactory = nullptr;
         m_descriptorFactory = nullptr;
@@ -43,8 +45,6 @@ namespace render {
     IWithRendering::~IWithRendering() {
         shutdownRendering();
     }
-    
-
 
     bool IWithRendering::initRendering(::utils::Window* win) {
         if (m_initialized) return false;
@@ -121,6 +121,21 @@ namespace render {
             return false;
         }
 
+        m_renderPass = new vulkan::RenderPass(m_swapChain);
+        if (!m_renderPass->init()) {
+            fatal("Failed to initialize builtin render pass for swap chain");
+            shutdownRendering();
+            return false;
+        }
+
+        m_frames = new core::FrameManager(m_swapChain, m_renderPass);
+        if (!m_frames->init()) {
+            shutdownRendering();
+            return false;
+        }
+
+        m_frames->subscribeLogger(m_logicalDevice->getInstance());
+
         m_shaderCompiler = new vulkan::ShaderCompiler();
         m_shaderCompiler->subscribeLogger(this);
 
@@ -140,9 +155,9 @@ namespace render {
         return true;
     }
 
-    bool IWithRendering::initDebugDrawing(vulkan::RenderPass* pass) {
+    bool IWithRendering::initDebugDrawing() {
         m_debugDraw = new utils::SimpleDebugDraw();
-        if (!m_debugDraw->init(m_shaderCompiler, m_swapChain, pass, m_vboFactory, m_uboFactory, m_descriptorFactory)) {
+        if (!m_debugDraw->init(m_shaderCompiler, m_swapChain, m_renderPass, m_vboFactory, m_uboFactory, m_descriptorFactory)) {
             delete m_debugDraw;
             return false;
         }
@@ -152,8 +167,8 @@ namespace render {
         return true;
     }
     
-    bool IWithRendering::initImGui(vulkan::RenderPass* pass) {
-        m_imgui = new utils::ImGuiContext(pass, m_logicalDevice->getGraphicsQueue());
+    bool IWithRendering::initImGui() {
+        m_imgui = new utils::ImGuiContext(m_renderPass, m_swapChain, m_logicalDevice->getGraphicsQueue());
         if (!m_imgui->init()) {
             delete m_imgui;
             return false;
@@ -197,6 +212,16 @@ namespace render {
         if (m_shaderCompiler) {
             delete m_shaderCompiler;
             m_shaderCompiler = nullptr;
+        }
+
+        if (m_frames) {
+            delete m_frames;
+            m_frames = nullptr;
+        }
+
+        if (m_renderPass) {
+            delete m_renderPass;
+            m_renderPass = nullptr;
         }
 
         if (m_swapChain) {
@@ -286,7 +311,13 @@ namespace render {
         log("Window resized, recreating swapchain (%dx%d)", width, height);
         m_logicalDevice->waitForIdle();
         if (!m_swapChain->recreate()) {
-            fatal("Failed to recreate swapchain after window resized.");
+            fatal("Failed to recreate swapchain after window resized");
+            shutdownRendering();
+        }
+
+        m_frames->shutdown();
+        if (!m_frames->init()) {
+            fatal("Failed to recreate frame manager after window resized");
             shutdownRendering();
         }
     }
@@ -315,6 +346,10 @@ namespace render {
         return m_swapChain;
     }
     
+    vulkan::RenderPass* IWithRendering::getRenderPass() const {
+        return m_renderPass;
+    }
+
     vulkan::ShaderCompiler* IWithRendering::getShaderCompiler() const {
         return m_shaderCompiler;
     }
@@ -325,6 +360,10 @@ namespace render {
     
     utils::ImGuiContext* IWithRendering::getImGui() const {
         return m_imgui;
+    }
+    
+    core::FrameManager* IWithRendering::getFrameManager() const {
+        return m_frames;
     }
 
     vulkan::Vertices* IWithRendering::allocateVertices(core::DataFormat* fmt, u32 count) {
@@ -337,5 +376,17 @@ namespace render {
     
     vulkan::DescriptorSet* IWithRendering::allocateDescriptor(vulkan::Pipeline* pipeline) {
         return m_descriptorFactory->allocate(pipeline);
+    }
+
+    core::FrameContext* IWithRendering::getFrame() {
+        if (!m_frames) return nullptr;
+
+        return m_frames->getFrame();
+    }
+
+    void IWithRendering::releaseFrame(core::FrameContext* frame) {
+        if (!m_frames) return;
+
+        m_frames->releaseFrame(frame);
     }
 };

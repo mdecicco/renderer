@@ -19,10 +19,11 @@ namespace render {
 
         class FrameManager : public ::utils::IWithLogging {
             public:
-                FrameManager(vulkan::RenderPass* renderPass, u32 maxLiveFrames);
+                FrameManager(vulkan::SwapChain* swapChain, vulkan::RenderPass* renderPass);
                 ~FrameManager();
 
                 vulkan::CommandPool* getCommandPool() const;
+                u32 getFrameCount() const;
 
                 bool init();
                 void shutdown();
@@ -48,7 +49,7 @@ namespace render {
                 FrameNode* m_freeFrames;
                 FrameNode* m_liveFrames;
                 FrameNode* m_frames;
-                u32 m_maxLiveFrames;
+                u32 m_frameCount;
         };
     };
 };

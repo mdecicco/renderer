@@ -26,10 +26,10 @@ namespace render {
                 void setClearColor(u32 attachmentIdx, const vec4ui& clearColor);
                 void setClearColor(u32 attachmentIdx, const vec4i& clearColor);
                 void setClearDepthStencil(u32 attachmentIdx, f32 clearDepth, u32 clearStencil = 0);
-                void attach(VkImageView view, VkFormat format);
-                void attach(Texture* texture);
+                attachment& attach(VkImageView view, VkFormat format);
+                attachment& attach(Texture* texture);
 
-                bool init();
+                bool init(const vec2ui& dimensions);
                 void shutdown();
             
             private:

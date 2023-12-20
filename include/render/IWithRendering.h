@@ -32,6 +32,8 @@ namespace render {
 
     namespace core {
         class DataFormat;
+        class FrameManager;
+        class FrameContext;
     };
     
     namespace utils {
@@ -45,8 +47,8 @@ namespace render {
             virtual ~IWithRendering();
 
             bool initRendering(::utils::Window* win);
-            bool initDebugDrawing(vulkan::RenderPass* pass);
-            bool initImGui(vulkan::RenderPass* pass);
+            bool initDebugDrawing();
+            bool initImGui();
             void shutdownRendering();
 
             virtual const vulkan::PhysicalDevice* choosePhysicalDevice(const Array<vulkan::PhysicalDevice>& devices);
@@ -62,13 +64,17 @@ namespace render {
             vulkan::LogicalDevice* getLogicalDevice() const;
             vulkan::Surface* getSurface() const;
             vulkan::SwapChain* getSwapChain() const;
+            vulkan::RenderPass* getRenderPass() const;
             vulkan::ShaderCompiler* getShaderCompiler() const;
             utils::SimpleDebugDraw* getDebugDraw() const;
             utils::ImGuiContext* getImGui() const;
+            core::FrameManager* getFrameManager() const;
 
             vulkan::Vertices* allocateVertices(core::DataFormat* format, u32 count);
             vulkan::UniformObject* allocateUniformObject(core::DataFormat* format);
             vulkan::DescriptorSet* allocateDescriptor(vulkan::Pipeline* pipeline);
+            core::FrameContext* getFrame();
+            void releaseFrame(core::FrameContext* frame);
         
         private:
             ::utils::Window* m_window;
@@ -77,12 +83,14 @@ namespace render {
             vulkan::LogicalDevice* m_logicalDevice;
             vulkan::Surface* m_surface;
             vulkan::SwapChain* m_swapChain;
+            vulkan::RenderPass* m_renderPass;
             vulkan::ShaderCompiler* m_shaderCompiler;
             vulkan::VertexBufferFactory* m_vboFactory;
             vulkan::UniformBufferFactory* m_uboFactory;
             vulkan::DescriptorFactory* m_descriptorFactory;
             utils::SimpleDebugDraw* m_debugDraw;
             utils::ImGuiContext* m_imgui;
+            core::FrameManager* m_frames;
 
             bool m_initialized;
     };

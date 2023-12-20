@@ -2,27 +2,72 @@
 #include <render/vulkan/SwapChain.h>
 #include <render/vulkan/LogicalDevice.h>
 #include <render/vulkan/Instance.h>
-#include <render/core/FrameManager.h>
+
+#include <utils/Array.hpp>
 
 namespace render {
     namespace vulkan {
         RenderPass::RenderPass(SwapChain* swapChain) {
-            m_swapChain = swapChain;
+            m_device = swapChain->getDevice();
             m_renderPass = VK_NULL_HANDLE;
-            swapChain->onRenderPassCreated(this);
+
+            // color attachment
+            m_attachmentDescs.push({});
+            auto& ca = m_attachmentDescs.last();
+            ca.format = swapChain->getFormat();
+            ca.samples = VK_SAMPLE_COUNT_1_BIT;
+            ca.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            ca.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            ca.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            ca.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            ca.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            ca.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+            m_attachmentRefs.push({});
+            auto& car = m_attachmentRefs.last();
+            car.attachment = 0;
+            car.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+            // depth attachment
+            m_attachmentDescs.push({});
+            auto& da = m_attachmentDescs.last();
+            da.format = VK_FORMAT_D32_SFLOAT;
+            da.samples = VK_SAMPLE_COUNT_1_BIT;
+            da.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            da.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            da.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            da.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            da.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            da.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+            m_attachmentRefs.push({});
+            auto& dar = m_attachmentRefs.last();
+            dar.attachment = 1;
+            dar.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+            m_subpasses.push({});
+            auto& sd = m_subpasses.last();
+            sd.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            sd.colorAttachmentCount = 1;
+            sd.pColorAttachments = &m_attachmentRefs[0]; 
+            sd.pDepthStencilAttachment = &m_attachmentRefs[1];
+
+            m_subpassDeps.push({});
+            auto& dep = m_subpassDeps.last();
+            dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+            dep.dstSubpass = 0;
+            dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            dep.srcAccessMask = 0;
+            dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         }
 
         RenderPass::~RenderPass() {
             shutdown();
-            m_swapChain->onRenderPassDestroyed(this);
         }
 
-        SwapChain* RenderPass::getSwapChain() const {
-            return m_swapChain;
-        }
-        
-        core::FrameManager* RenderPass::getFrameManager() const {
-            return m_frames;
+        LogicalDevice* RenderPass::getDevice() const {
+            return m_device;
         }
 
         VkRenderPass RenderPass::get() const {
@@ -31,84 +76,26 @@ namespace render {
 
 
         bool RenderPass::init() {
-            VkAttachmentDescription at[2] = {{}, {}};
-            VkAttachmentReference ar[2] = {{}, {}};
-
-            // color attachment
-            at[0].format = m_swapChain->getFormat();
-            at[0].samples = VK_SAMPLE_COUNT_1_BIT;
-            at[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            at[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-            at[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            at[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            at[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            at[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-            ar[0].attachment = 0;
-            ar[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-            // depth attachment
-            at[1].format = VK_FORMAT_D32_SFLOAT;
-            at[1].samples = VK_SAMPLE_COUNT_1_BIT;
-            at[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            at[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            at[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            at[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            at[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            at[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-            ar[1].attachment = 1;
-            ar[1].layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-            VkSubpassDescription sd = {};
-            sd.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-            sd.colorAttachmentCount = 1;
-            sd.pColorAttachments = &ar[0]; 
-            sd.pDepthStencilAttachment = &ar[1];
-
-            VkSubpassDependency dep = {};
-            dep.srcSubpass = VK_SUBPASS_EXTERNAL;
-            dep.dstSubpass = 0;
-            dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-            dep.srcAccessMask = 0;
-            dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-            dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
             VkRenderPassCreateInfo rpi = {};
             rpi.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-            rpi.attachmentCount = 2;
-            rpi.pAttachments = at;
-            rpi.subpassCount = 1;
-            rpi.pSubpasses = &sd;
-            rpi.dependencyCount = 1;
-            rpi.pDependencies = &dep;
+            rpi.attachmentCount = m_attachmentDescs.size();
+            rpi.pAttachments = m_attachmentDescs.data();
+            rpi.subpassCount = m_subpasses.size();
+            rpi.pSubpasses = m_subpasses.data();
+            rpi.dependencyCount = m_subpassDeps.size();
+            rpi.pDependencies = m_subpassDeps.data();
 
-            LogicalDevice* dev = m_swapChain->getDevice();
-            if (vkCreateRenderPass(dev->get(), &rpi, dev->getInstance()->getAllocator(), &m_renderPass) != VK_SUCCESS) {
+            if (vkCreateRenderPass(m_device->get(), &rpi, m_device->getInstance()->getAllocator(), &m_renderPass) != VK_SUCCESS) {
                 shutdown();
                 return false;
             }
-
-            m_frames = new core::FrameManager(this, m_swapChain->getImages().size());
-            if (!m_frames->init()) {
-                shutdown();
-                return false;
-            }
-
-            m_frames->subscribeLogger(dev->getInstance());
 
             return true;
         }
 
         void RenderPass::shutdown() {
-            if (m_frames) {
-                delete m_frames;
-                m_frames = nullptr;
-            }
-            
             if (m_renderPass) {
-                LogicalDevice* dev = m_swapChain->getDevice();
-                vkDestroyRenderPass(dev->get(), m_renderPass, dev->getInstance()->getAllocator());
+                vkDestroyRenderPass(m_device->get(), m_renderPass, m_device->getInstance()->getAllocator());
                 m_renderPass = VK_NULL_HANDLE;
             }
         }
@@ -116,18 +103,6 @@ namespace render {
         bool RenderPass::recreate() {
             shutdown();
             return init();
-        }
-
-        core::FrameContext* RenderPass::getFrame() {
-            if (!m_frames) return nullptr;
-
-            return m_frames->getFrame();
-        }
-
-        void RenderPass::releaseFrame(core::FrameContext* frame) {
-            if (!m_frames) return;
-
-            m_frames->releaseFrame(frame);
         }
     };
 };

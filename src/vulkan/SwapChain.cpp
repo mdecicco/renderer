@@ -9,6 +9,7 @@
 #include <render/vulkan/Pipeline.h>
 #include <render/vulkan/RenderPass.h>
 #include <render/vulkan/Texture.h>
+#include <render/core/FrameManager.h>
 
 #include <utils/Window.h>
 #include <utils/Array.hpp>
@@ -36,6 +37,10 @@ namespace render {
 
         bool SwapChain::isValid() const {
             return m_swapChain != nullptr;
+        }
+
+        u32 SwapChain::getImageCount() const {
+            return m_images.size();
         }
         
         const Array<VkImage>& SwapChain::getImages() const {
@@ -300,14 +305,6 @@ namespace render {
 
             m_swapChain = newSwapChain;
             
-            // Update render passes
-            for (u32 i = 0;i < m_renderPasses.size();i++) {
-                if (!m_renderPasses[i]->recreate()) {
-                    shutdown();
-                    return false;
-                }
-            }
-            
             // Update pipelines
             for (u32 i = 0;i < m_pipelines.size();i++) {
                 if (!m_pipelines[i]->recreate()) {
@@ -351,18 +348,6 @@ namespace render {
             });
             if (idx == -1) return;
             m_pipelines.remove(u32(idx));
-        }
-        
-        void SwapChain::onRenderPassCreated(RenderPass* pass) {
-            m_renderPasses.push(pass);
-        }
-
-        void SwapChain::onRenderPassDestroyed(RenderPass* pass) {
-            i64 idx = m_renderPasses.findIndex([pass](RenderPass* p) {
-                return p == pass;
-            });
-            if (idx == -1) return;
-            m_renderPasses.remove(u32(idx));
         }
     };
 };

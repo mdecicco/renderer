@@ -11,6 +11,7 @@ namespace render {
         class LogicalDevice;
         class Queue;
         class RenderPass;
+        class SwapChain;
     };
 
     namespace core {
@@ -22,6 +23,7 @@ namespace render {
             public:
                 ImGuiContext(
                     vulkan::RenderPass* renderPass,
+                    vulkan::SwapChain* swapChain,
                     const vulkan::Queue* graphicsQueue
                 );
                 ~ImGuiContext();
@@ -47,6 +49,7 @@ namespace render {
                 vulkan::LogicalDevice* m_device;
                 const vulkan::Queue* m_gfxQueue;
                 vulkan::RenderPass* m_renderPass;
+                vulkan::SwapChain* m_swapChain;
                 vec2f m_wheel;
                 ::utils::Timer m_dt;
 

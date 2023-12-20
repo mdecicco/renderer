@@ -63,7 +63,7 @@ namespace render {
         }
 
         bool FrameContext::begin() {
-            if (m_frameStarted) return false;
+            if (m_frameStarted || !m_buffer) return false;
 
             if (vkWaitForFences(m_device->get(), 1, &m_fence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) return false;
             if (vkResetFences(m_device->get(), 1, &m_fence) != VK_SUCCESS) return false;
@@ -118,8 +118,9 @@ namespace render {
             return true;
         }
 
-        bool FrameContext::init(vulkan::RenderPass* renderPass) {
-            m_swapChain = renderPass->getSwapChain();
+        bool FrameContext::init(vulkan::SwapChain* swapChain, vulkan::CommandBuffer* cb) {
+            m_swapChain = swapChain;
+            m_buffer = cb;
             m_device = m_swapChain->getDevice();
 
             VkSemaphoreCreateInfo si = {};
@@ -175,12 +176,10 @@ namespace render {
             m_frameStarted = false;
         }
 
-        void FrameContext::onAcquire(vulkan::CommandBuffer* buf) {
-            m_buffer = buf;
+        void FrameContext::onAcquire() {
         }
 
         void FrameContext::onFree() {
-            m_buffer = nullptr;
             m_scImageIdx = 0;
             m_framebuffer = nullptr;
             m_frameStarted = false;

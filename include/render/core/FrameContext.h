@@ -33,9 +33,9 @@ namespace render {
                 FrameContext();
                 ~FrameContext();
 
-                bool init(vulkan::RenderPass* renderPass);
+                bool init(vulkan::SwapChain* swapChain, vulkan::CommandBuffer* cb);
                 void shutdown();
-                void onAcquire(vulkan::CommandBuffer* buf);
+                void onAcquire();
                 void onFree();
 
                 vulkan::LogicalDevice* m_device;

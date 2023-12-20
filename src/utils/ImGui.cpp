@@ -134,11 +134,13 @@ namespace render {
     namespace utils {
         ImGuiContext::ImGuiContext(
             vulkan::RenderPass* renderPass,
+            vulkan::SwapChain* swapChain,
             const vulkan::Queue* graphicsQueue
         ) {
-            m_device = renderPass->getSwapChain()->getDevice();
+            m_device = renderPass->getDevice();
             m_gfxQueue = graphicsQueue;
             m_renderPass = renderPass;
+            m_swapChain = swapChain;
             m_descriptorPool = VK_NULL_HANDLE;
             m_contextCreated = false;
             m_libInitialized = false;
@@ -193,7 +195,7 @@ namespace render {
             ii.Queue = m_gfxQueue->get();
             ii.QueueFamily = m_gfxQueue->getFamily().getIndex();
             ii.DescriptorPool = m_descriptorPool;
-            ii.ImageCount = m_renderPass->getSwapChain()->getImageViews().size();
+            ii.ImageCount = m_swapChain->getImageViews().size();
             ii.MinImageCount = ii.ImageCount;
             ii.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
@@ -248,8 +250,7 @@ namespace render {
 
             ImGui_ImplVulkan_NewFrame();
 
-            vulkan::SwapChain* sc = m_renderPass->getSwapChain();
-            auto& dims = sc->getExtent();
+            auto& dims = m_swapChain->getExtent();
 
             ImGuiIO& io = ImGui::GetIO();
             io.DisplaySize = ImVec2(dims.width, dims.height);

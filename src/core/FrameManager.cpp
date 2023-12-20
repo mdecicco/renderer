@@ -13,17 +13,17 @@
 
 namespace render {
     namespace core {
-        FrameManager::FrameManager(vulkan::RenderPass* renderPass, u32 maxLiveFrames) : utils::IWithLogging("Frame Manager") {
+        FrameManager::FrameManager(vulkan::SwapChain* swapChain, vulkan::RenderPass* renderPass) : utils::IWithLogging("Frame Manager") {
             m_renderPass = renderPass;
-            m_swapChain = m_renderPass->getSwapChain();
+            m_swapChain = swapChain;
             m_device = m_swapChain->getDevice();
             m_cmdPool = new vulkan::CommandPool(m_device, &m_device->getGraphicsQueue()->getFamily());
-            m_maxLiveFrames = maxLiveFrames;
+            m_frameCount = m_swapChain->getImageCount();
 
-            m_frames = new FrameNode[maxLiveFrames];
+            m_frames = new FrameNode[m_frameCount];
             m_liveFrames = nullptr;
             m_freeFrames = m_frames;
-            for (u32 i = 0;i < maxLiveFrames;i++) {
+            for (u32 i = 0;i < m_frameCount;i++) {
                 m_frames[i].frame = new FrameContext();
                 m_frames[i].frame->subscribeLogger(this);
                 m_frames[i].frame->m_mgr = this;
@@ -45,7 +45,7 @@ namespace render {
             delete m_cmdPool;
             m_cmdPool = nullptr;
             
-            for (u32 i = 0;i < m_maxLiveFrames;i++) {
+            for (u32 i = 0;i < m_frameCount;i++) {
                 delete m_frames[i].frame;
             }
 
@@ -56,18 +56,31 @@ namespace render {
         vulkan::CommandPool* FrameManager::getCommandPool() const {
             return m_cmdPool;
         }
+        
+        u32 FrameManager::getFrameCount() const {
+            return m_frameCount;
+        }
 
         bool FrameManager::init() {
             if (!m_cmdPool->init(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT)) return false;
 
-            m_framebuffers.reserve(m_maxLiveFrames);
-            for (u32 i = 0;i < m_maxLiveFrames;i++) {
-                if (!m_frames[i].frame->init(m_renderPass)) return false;
+            m_framebuffers.reserve(m_frameCount);
+            for (u32 i = 0;i < m_frameCount;i++) {
+                vulkan::CommandBuffer* cb = m_cmdPool->createBuffer(true);
+                if (!cb) {
+                    fatal("Failed to acquire command buffer for frame");
+                    shutdown();
+                    return false;
+                }
+
+                if (!m_frames[i].frame->init(m_swapChain, cb)) return false;
 
                 vulkan::Framebuffer* fb = new vulkan::Framebuffer(m_renderPass);
                 fb->attach(m_swapChain->getImageViews()[i], m_swapChain->getFormat());
                 fb->attach(m_swapChain->getDepthBuffers()[i]);
-                if (!fb->init()) {
+
+                auto& extent = m_swapChain->getExtent();
+                if (!fb->init(vec2ui(extent.width, extent.height))) {
                     fatal("Failed to create framebuffer for frame");
                     shutdown();
                     return false;
@@ -80,7 +93,7 @@ namespace render {
         }
 
         void FrameManager::shutdown() {
-            for (u32 i = 0;i < m_maxLiveFrames;i++) {
+            for (u32 i = 0;i < m_frameCount;i++) {
                 m_frames[i].frame->shutdown();
                 m_framebuffers[i]->shutdown();
             }
@@ -100,7 +113,7 @@ namespace render {
             n->next = m_liveFrames;
             m_liveFrames = n;
 
-            n->frame->onAcquire(m_cmdPool->createBuffer(true));
+            n->frame->onAcquire();
 
             return n->frame;
         }
@@ -120,7 +133,6 @@ namespace render {
             n->next = m_freeFrames;
             m_freeFrames = n;
 
-            m_cmdPool->freeBuffer(n->frame->m_buffer);
             n->frame->onFree();
         }
     };

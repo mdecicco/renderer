@@ -61,9 +61,6 @@ class TestApp : public IWithRendering {
             if (m_pipeline) delete m_pipeline;
             m_pipeline = nullptr;
 
-            if (m_renderPass) delete m_renderPass;
-            m_renderPass = nullptr;
-
             shutdownRendering();
 
             if (m_window) delete m_window;
@@ -80,17 +77,14 @@ class TestApp : public IWithRendering {
             if (!m_window->setOpen(true)) return false;
             if (!initRendering(m_window)) return false;
 
-            m_renderPass = new RenderPass(getSwapChain());
-            if (!m_renderPass->init()) return false;
-
-            if (!initImGui(m_renderPass)) return false;
-            if (!initDebugDrawing(m_renderPass)) return false;
+            if (!initImGui()) return false;
+            if (!initDebugDrawing()) return false;
 
             m_pipeline = new Pipeline(
                 getShaderCompiler(),
                 getLogicalDevice(),
                 getSwapChain(),
-                m_renderPass
+                getRenderPass()
             );
 
             const char* vsh =
@@ -152,6 +146,11 @@ class TestApp : public IWithRendering {
         }
 
         void run() {
+            Timer tmr;
+            Timer dt;
+            dt.start();
+            tmr.start();
+
             Vertices* verts = allocateVertices(&m_vfmt, 362);
             if (!verts) abort();
 
@@ -187,12 +186,9 @@ class TestApp : public IWithRendering {
             set->add(m_texture, 1);
             set->update();
 
-            Timer tmr;
-            tmr.start();
-
             ubo u;
             
-            CommandBuffer* buf = m_renderPass->getFrameManager()->getCommandPool()->createBuffer(true);
+            CommandBuffer* buf = getFrameManager()->getCommandPool()->createBuffer(true);
             if (buf->begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT)) {
                 struct pixel { u8 r, g, b, a; };
                 pixel* pixels = (pixel*)m_texture->getStagingBuffer()->getPointer();
@@ -220,9 +216,15 @@ class TestApp : public IWithRendering {
             auto draw = getDebugDraw();
 
             while (m_window->isOpen()) {
+                f32 msf = 1000.0f * dt;
+                f32 fps = 1.0f / dt;
+                dt.reset();
+                dt.start();
+                m_window->setTitle(String::Format("Vulkan API Testing | %0.2f f/s | %0.4f ms/f", fps, msf));
+
                 m_window->pollEvents();
 
-                auto frame = m_renderPass->getFrame();
+                auto frame = getFrame();
                 frame->begin();
                 auto cb = frame->getCommandBuffer();
 
@@ -263,11 +265,7 @@ class TestApp : public IWithRendering {
                 cb->endRenderPass();
                 frame->end();
 
-
-                // todo: find out why frame's command buffer is still pending if
-                //       waitForIdle is not called here
-                getLogicalDevice()->waitForIdle();
-                m_renderPass->releaseFrame(frame);
+                releaseFrame(frame);
             }
 
             verts->free();
@@ -288,7 +286,6 @@ class TestApp : public IWithRendering {
     protected:
         Window* m_window;
         Pipeline* m_pipeline;
-        RenderPass* m_renderPass;
         Texture* m_texture;
         core::DataFormat m_vfmt;
         core::DataFormat m_ufmt;

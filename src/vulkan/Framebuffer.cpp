@@ -56,26 +56,28 @@ namespace render {
             m_attachments[attachmentIdx].clearValue.depthStencil.stencil = clearStencil;
         }
 
-        void Framebuffer::attach(VkImageView view, VkFormat format) {
+        Framebuffer::attachment& Framebuffer::attach(VkImageView view, VkFormat format) {
             m_attachments.push({
                 view,
                 format,
                 { 0, 0, 0, 0 }
             });
+
+            return m_attachments.last();
         }
 
-        void Framebuffer::attach(Texture* texture) {
+        Framebuffer::attachment& Framebuffer::attach(Texture* texture) {
             m_attachments.push({
                 texture->getView(),
                 texture->getFormat(),
                 { 0, 0, 0, 0 }
             });
+
+            return m_attachments.last();
         }
 
-        bool Framebuffer::init() {
+        bool Framebuffer::init(const vec2ui& dimensions) {
             if (m_framebuffer || m_attachments.size() == 0) return false;
-
-            auto& extent = m_renderPass->getSwapChain()->getExtent();
 
             VkImageView views[16] = {};
             for (u32 i = 0;i < m_attachments.size();i++) {
@@ -87,11 +89,11 @@ namespace render {
             fbi.renderPass = m_renderPass->get();
             fbi.attachmentCount = m_attachments.size();
             fbi.pAttachments = views;
-            fbi.width = extent.width;
-            fbi.height = extent.height;
+            fbi.width = dimensions.x;
+            fbi.height = dimensions.y;
             fbi.layers = 1;
 
-            LogicalDevice* dev = m_renderPass->getSwapChain()->getDevice();
+            LogicalDevice* dev = m_renderPass->getDevice();
 
             if (vkCreateFramebuffer(dev->get(), &fbi, dev->getInstance()->getAllocator(), &m_framebuffer) != VK_SUCCESS) {
                 dev->getInstance()->error(String::Format("Failed to create framebuffer"));
@@ -104,7 +106,7 @@ namespace render {
 
         void Framebuffer::shutdown() {
             if (m_framebuffer) {
-                LogicalDevice* dev = m_renderPass->getSwapChain()->getDevice();
+                LogicalDevice* dev = m_renderPass->getDevice();
                 vkDestroyFramebuffer(dev->get(), m_framebuffer, dev->getInstance()->getAllocator());
                 m_framebuffer = VK_NULL_HANDLE;
             }
