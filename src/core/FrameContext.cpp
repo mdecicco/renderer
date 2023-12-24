@@ -2,7 +2,6 @@
 #include <render/core/FrameManager.h>
 #include <render/vulkan/LogicalDevice.h>
 #include <render/vulkan/Instance.h>
-#include <render/vulkan/Pipeline.h>
 #include <render/vulkan/SwapChain.h>
 #include <render/vulkan/RenderPass.h>
 #include <render/vulkan/CommandBuffer.h>

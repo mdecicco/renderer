@@ -5,7 +5,7 @@
 #include <render/vulkan/DescriptorSet.h>
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/RenderPass.h>
-#include <render/vulkan/Pipeline.h>
+#include <render/vulkan/GraphicsPipeline.h>
 
 #include <utils/Array.hpp>
 
@@ -45,7 +45,7 @@ namespace render {
             m_dsFactory = dsFactory;
             m_maxLines = maxLines;
 
-            m_pipeline = new vulkan::Pipeline(compiler, m_swapChain->getDevice(), m_swapChain, m_renderPass);
+            m_pipeline = new vulkan::GraphicsPipeline(compiler, m_swapChain->getDevice(), m_swapChain, m_renderPass);
             m_pipeline->setVertexFormat(&m_vfmt);
             m_pipeline->addUniformBlock(0, &m_ufmt, VK_SHADER_STAGE_VERTEX_BIT);
             m_pipeline->addDynamicState(VK_DYNAMIC_STATE_VIEWPORT);
@@ -54,6 +54,13 @@ namespace render {
             m_pipeline->setDepthTestEnabled(true);
             m_pipeline->setDepthCompareOp(COMPARE_OP::CO_LESS_OR_EQUAL);
             m_pipeline->setDepthWriteEnabled(true);
+            m_pipeline->setColorBlendEnabled(true);
+            m_pipeline->setColorBlendOp(BLEND_OP::BO_ADD);
+            m_pipeline->setAlphaBlendOp(BLEND_OP::BO_ADD);
+            m_pipeline->setSrcColorBlendFactor(BLEND_FACTOR::BF_SRC_ALPHA);
+            m_pipeline->setDstColorBlendFactor(BLEND_FACTOR::BF_ONE_MINUS_SRC_ALPHA);
+            m_pipeline->setSrcAlphaBlendFactor(BLEND_FACTOR::BF_ONE);
+            m_pipeline->setDstAlphaBlendFactor(BLEND_FACTOR::BF_ONE_MINUS_SRC_ALPHA);
 
             const char* vsh =
                 "layout (location = 0) in vec3 v_pos;\n"

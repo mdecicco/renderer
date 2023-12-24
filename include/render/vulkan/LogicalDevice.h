@@ -32,6 +32,7 @@ namespace render {
                 Instance* getInstance() const;
                 const Array<Queue*>& getQueues() const;
                 const Queue* getPresentationQueue() const;
+                const Queue* getComputeQueue() const;
                 const Queue* getGraphicsQueue() const;
             
             protected:
@@ -43,6 +44,7 @@ namespace render {
                     bool needsTransfer,
                     Surface* surface,
                     i32* outSurfaceQueueInfoIdx,
+                    i32* outCmpQueueInfoIdx,
                     i32* outGfxQueueInfoIdx
                 ) const;
 
@@ -53,6 +55,7 @@ namespace render {
                 Array<const char*> m_enabledLayers;
                 Array<Queue*> m_queues;
                 Queue* m_presentQueue;
+                Queue* m_computeQueue;
                 Queue* m_gfxQueue;
         };
     };

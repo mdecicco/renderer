@@ -10,6 +10,7 @@ namespace render {
         class Texture;
         class UniformObject;
         class DescriptorSet;
+        class Buffer;
 
         class DescriptorPool {
             public:
@@ -48,6 +49,7 @@ namespace render {
 
                 void add(Texture* tex, u32 bindingIndex);
                 void add(UniformObject* uo, u32 bindingIndex);
+                void add(Buffer* storageBuffer, u32 bindingIndex);
                 void update();
 
                 void free();
@@ -60,6 +62,7 @@ namespace render {
                 struct descriptor {
                     UniformObject* uniform;
                     Texture* tex;
+                    Buffer* storageBuffer;
                     u32 bindingIdx;
                 };
 

@@ -7,8 +7,10 @@ namespace render {
         class LogicalDevice;
         class CommandPool;
         class Framebuffer;
+        class GraphicsPipeline;
         class Pipeline;
         class VertexBuffer;
+        class Buffer;
         class Vertices;
         class DescriptorSet;
 
@@ -24,11 +26,12 @@ namespace render {
                 bool end();
                 bool reset();
 
-                void beginRenderPass(Pipeline* pipeline, Framebuffer* target);
+                void beginRenderPass(GraphicsPipeline* pipeline, Framebuffer* target);
                 void endRenderPass();
                 void bindPipeline(Pipeline* pipeline, VkPipelineBindPoint bindPoint);
                 void bindDescriptorSet(DescriptorSet* set, VkPipelineBindPoint bindPoint);
                 void bindVertexBuffer(VertexBuffer* vbo);
+                void bindVertexBuffer(Buffer* vbo);
                 void setViewport(f32 x, f32 y, f32 width, f32 height, f32 minZ, f32 maxZ);
                 void setScissor(i32 x, i32 y, u32 width, u32 height);
                 void draw(Vertices* vertices);

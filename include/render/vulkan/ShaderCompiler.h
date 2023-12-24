@@ -7,9 +7,10 @@
 
 namespace render {
     namespace vulkan {
+        class LogicalDevice;
         class ShaderCompiler : public ::utils::IWithLogging  {
             public:
-                ShaderCompiler();
+                ShaderCompiler(LogicalDevice* device);
                 ~ShaderCompiler();
 
                 bool init();
@@ -18,6 +19,7 @@ namespace render {
                 glslang::TShader* compileShader(const String& source, EShLanguage type);
             
             protected:
+                LogicalDevice* m_device;
                 bool m_isInitialized;
         };
     };

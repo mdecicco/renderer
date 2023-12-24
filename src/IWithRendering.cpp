@@ -11,7 +11,7 @@
 #include <render/vulkan/SwapChainSupport.h>
 #include <render/vulkan/SwapChain.h>
 #include <render/vulkan/ShaderCompiler.h>
-#include <render/vulkan/Pipeline.h>
+#include <render/vulkan/GraphicsPipeline.h>
 #include <render/vulkan/RenderPass.h>
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/Queue.h>
@@ -136,7 +136,7 @@ namespace render {
 
         m_frames->subscribeLogger(m_logicalDevice->getInstance());
 
-        m_shaderCompiler = new vulkan::ShaderCompiler();
+        m_shaderCompiler = new vulkan::ShaderCompiler(m_logicalDevice);
         m_shaderCompiler->subscribeLogger(this);
 
         if (!m_shaderCompiler->init()) {
@@ -155,9 +155,9 @@ namespace render {
         return true;
     }
 
-    bool IWithRendering::initDebugDrawing() {
+    bool IWithRendering::initDebugDrawing(u32 maxLines) {
         m_debugDraw = new utils::SimpleDebugDraw();
-        if (!m_debugDraw->init(m_shaderCompiler, m_swapChain, m_renderPass, m_vboFactory, m_uboFactory, m_descriptorFactory)) {
+        if (!m_debugDraw->init(m_shaderCompiler, m_swapChain, m_renderPass, m_vboFactory, m_uboFactory, m_descriptorFactory, maxLines)) {
             delete m_debugDraw;
             return false;
         }

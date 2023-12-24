@@ -33,8 +33,7 @@ add_sources("src" "utils")
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory("./deps")
-add_subdirectory("./test")
-add_subdirectory("./dvd")
+add_subdirectory("./examples")
 
 add_library(render ${all_sources})
 

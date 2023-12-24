@@ -16,7 +16,7 @@ namespace render {
         class DescriptorFactory;
         class DescriptorSet;
         class CommandBuffer;
-        class Pipeline;
+        class GraphicsPipeline;
         class RenderPass;
         class ShaderCompiler;
     };
@@ -75,7 +75,7 @@ namespace render {
                 vulkan::DescriptorFactory* m_dsFactory;
                 vulkan::SwapChain* m_swapChain;
                 vulkan::RenderPass* m_renderPass;
-                vulkan::Pipeline* m_pipeline;
+                vulkan::GraphicsPipeline* m_pipeline;
                 Array<vulkan::Vertices*> m_frameVertices;
                 Array<vulkan::UniformObject*> m_frameUniforms;
                 Array<vulkan::DescriptorSet*> m_frameDescriptorSets;

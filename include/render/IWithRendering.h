@@ -47,7 +47,7 @@ namespace render {
             virtual ~IWithRendering();
 
             bool initRendering(::utils::Window* win);
-            bool initDebugDrawing();
+            bool initDebugDrawing(u32 maxLines = 4096);
             bool initImGui();
             void shutdownRendering();
 

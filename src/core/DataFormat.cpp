@@ -58,6 +58,10 @@ namespace render {
             return m_attrs;
         }
 
+        void DataFormat::setSize(u32 size) {
+            m_size = size;
+        }
+
         u32 DataFormat::getSize() const {
             return m_size;
         }

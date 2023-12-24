@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 #include <render/IWithRendering.h>
-#include <render/vulkan/Pipeline.h>
+#include <render/vulkan/GraphicsPipeline.h>
 #include <render/vulkan/CommandPool.h>
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/LogicalDevice.h>
@@ -100,7 +100,7 @@ class Screensaver : public IWithRendering {
         Screensaver(MonitorInfo* monitor) {
             m_window = new Window();
             m_window->setPosition(monitor->position.x, monitor->position.y);
-            m_window->setSize(monitor->dimensions.x, monitor->dimensions.y);
+            m_window->setSize(monitor->actualDimensions.x, monitor->actualDimensions.y);
             m_window->setTitle("DVD Screensaver");
 
             m_pipeline = nullptr;
@@ -121,8 +121,8 @@ class Screensaver : public IWithRendering {
             );
             m_acceleration = vec2f(0.0f, 0.0f);
             m_pos = vec2f(
-                random(0.0f, f32(monitor->dimensions.x - logo_width)),
-                random(0.0f, f32(monitor->dimensions.y - logo_height))
+                random(0.0f, f32(monitor->actualDimensions.x - logo_width)),
+                random(0.0f, f32(monitor->actualDimensions.y - logo_height))
             );
             m_attracting = false;
             m_tint = hsv(vec4f(random(0.0f, 360.0f), 1.0f, 1.0f, 1.0f));
@@ -165,7 +165,7 @@ class Screensaver : public IWithRendering {
 
             if (!initRendering(m_window)) return false;
 
-            m_pipeline = new Pipeline(
+            m_pipeline = new GraphicsPipeline(
                 getShaderCompiler(),
                 getLogicalDevice(),
                 getSwapChain(),
@@ -539,7 +539,7 @@ class Screensaver : public IWithRendering {
     
     protected:
         Window* m_window;
-        Pipeline* m_pipeline;
+        GraphicsPipeline* m_pipeline;
         Texture* m_texture;
         Vertices* m_vertices;
         UniformObject* m_uniforms;

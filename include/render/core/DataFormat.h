@@ -73,6 +73,8 @@ namespace render {
                 }
 
                 const Array<Attribute>& getAttributes() const;
+
+                void setSize(u32 size);
                 u32 getSize() const;
                 u32 getUniformBlockSize() const;
                 bool isValid() const;

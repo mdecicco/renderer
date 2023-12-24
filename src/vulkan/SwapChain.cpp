@@ -6,7 +6,7 @@
 #include <render/vulkan/Queue.h>
 #include <render/vulkan/QueueFamily.h>
 #include <render/vulkan/Instance.h>
-#include <render/vulkan/Pipeline.h>
+#include <render/vulkan/GraphicsPipeline.h>
 #include <render/vulkan/RenderPass.h>
 #include <render/vulkan/Texture.h>
 #include <render/core/FrameManager.h>
@@ -338,12 +338,12 @@ namespace render {
             m_createInfo = {};
         }
         
-        void SwapChain::onPipelineCreated(Pipeline* pipeline) {
+        void SwapChain::onPipelineCreated(GraphicsPipeline* pipeline) {
             m_pipelines.push(pipeline);
         }
 
-        void SwapChain::onPipelineDestroyed(Pipeline* pipeline) {
-            i64 idx = m_pipelines.findIndex([pipeline](Pipeline* p) {
+        void SwapChain::onPipelineDestroyed(GraphicsPipeline* pipeline) {
+            i64 idx = m_pipelines.findIndex([pipeline](GraphicsPipeline* p) {
                 return p == pipeline;
             });
             if (idx == -1) return;

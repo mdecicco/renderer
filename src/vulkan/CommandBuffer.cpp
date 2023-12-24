@@ -4,6 +4,7 @@
 #include <render/vulkan/Instance.h>
 #include <render/vulkan/QueueFamily.h>
 #include <render/vulkan/Pipeline.h>
+#include <render/vulkan/GraphicsPipeline.h>
 #include <render/vulkan/SwapChain.h>
 #include <render/vulkan/RenderPass.h>
 #include <render/vulkan/VertexBuffer.h>
@@ -74,7 +75,7 @@ namespace render {
             return vkResetCommandBuffer(m_buffer, 0) == VK_SUCCESS;
         }
 
-        void CommandBuffer::beginRenderPass(Pipeline* pipeline, Framebuffer* target) {
+        void CommandBuffer::beginRenderPass(GraphicsPipeline* pipeline, Framebuffer* target) {
             if (!m_buffer || !m_isRecording) return;
 
             VkClearValue clearValues[16] = {};
@@ -124,6 +125,13 @@ namespace render {
             if (!m_buffer || !m_isRecording) return;
             VkDeviceSize offset = 0;
             VkBuffer buf = vbo->getBuffer();
+            vkCmdBindVertexBuffers(m_buffer, 0, 1, &buf, &offset);
+        }
+        
+        void CommandBuffer::bindVertexBuffer(Buffer* vbo) {
+            if (!m_buffer || !m_isRecording) return;
+            VkDeviceSize offset = 0;
+            VkBuffer buf = vbo->get();
             vkCmdBindVertexBuffers(m_buffer, 0, 1, &buf, &offset);
         }
 

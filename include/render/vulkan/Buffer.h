@@ -26,6 +26,7 @@ namespace render {
                 bool flush(u64 offset = 0, u64 size = VK_WHOLE_SIZE);
                 bool write(const void* src, u64 offset, u64 size);
                 bool read(u64 offset, u64 size, void* dst, bool fetchFromDevice = true);
+                bool fetch(u64 offset, u64 size);
                 void* getPointer(u64 offset = 0);
                 void unmap();
 

@@ -13,6 +13,7 @@ namespace render {
             m_physicalDevice = device;
             m_isInitialized = false;
             m_presentQueue = nullptr;
+            m_computeQueue = nullptr;
             m_gfxQueue = nullptr;
         }
 
@@ -77,7 +78,14 @@ namespace render {
             VkDeviceQueueCreateInfo queueInfo[4] = { {}, {}, {}, {} };
             i32 surfaceInfoIdx = -1;
             i32 gfxInfoIdx = -1;
-            u32 queueCount = buildQueueInfo(families, queueInfo, needsGraphics, needsCompute, needsTransfer, surface, &surfaceInfoIdx, &gfxInfoIdx);
+            i32 cmpInfoIdx = -1;
+            u32 queueCount = buildQueueInfo(
+                families,
+                queueInfo,
+                needsGraphics, needsCompute, needsTransfer,
+                surface,
+                &surfaceInfoIdx, &cmpInfoIdx, &gfxInfoIdx
+            );
             if (queueCount == 0) return false;
 
             VkPhysicalDeviceFeatures df = {};
@@ -113,6 +121,10 @@ namespace render {
 
                 if (needsGraphics && i == gfxInfoIdx) {
                     m_gfxQueue = first;
+                }
+
+                if (needsCompute && i == cmpInfoIdx) {
+                    m_computeQueue = first;
                 }
             }
 
@@ -153,6 +165,10 @@ namespace render {
         const Queue* LogicalDevice::getPresentationQueue() const {
             return m_presentQueue;
         }
+        
+        const Queue* LogicalDevice::getComputeQueue() const {
+            return m_computeQueue;
+        }
 
         const Queue* LogicalDevice::getGraphicsQueue() const {
             return m_gfxQueue;
@@ -166,6 +182,7 @@ namespace render {
             bool needsTransfer,
             Surface* surface,
             i32* outSurfaceQueueInfoIdx,
+            i32* outCmpQueueInfoIdx,
             i32* outGfxQueueInfoIdx
         ) const {
             if (families.size() == 0) return false;
@@ -250,6 +267,8 @@ namespace render {
                     infos[count].pQueuePriorities = &priority;
                     count++;
                 }
+
+                *outCmpQueueInfoIdx = i32(cmpIdx);
             }
             
             if (needsTransfer) {

@@ -46,17 +46,19 @@ namespace render {
         
         bool Buffer::getRange(u64 offset, u64 size, VkMappedMemoryRange& range) const {
             range = {};
-            if (offset + size >= m_size) return false;
+            if (size == VK_WHOLE_SIZE && offset != 0) return false;
+            if (size != VK_WHOLE_SIZE && offset + size > m_size) return false;
 
             if (size == VK_WHOLE_SIZE) offset = 0;
             else {
                 u32 nonCoherentAtomSize = m_device->getPhysicalDevice()->getProperties().limits.nonCoherentAtomSize;
                 if (nonCoherentAtomSize > 0) {
-                    size += (nonCoherentAtomSize - (size % nonCoherentAtomSize));
+                    u64 remainder = (size % nonCoherentAtomSize);
+                    if (remainder > 0) size += (nonCoherentAtomSize - remainder);
                 }
-            }
 
-            if (offset + size >= m_size) return false;
+                if (offset + size > m_size) return false;
+            }
 
             range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
             range.pNext = VK_NULL_HANDLE;
@@ -82,7 +84,8 @@ namespace render {
         
         bool Buffer::flush(u64 offset, u64 size) {
             if (!m_mappedMemory) return false;
-            if (offset + size >= m_size) return false;
+            if (size == VK_WHOLE_SIZE && offset != 0) return false;
+            if (size != VK_WHOLE_SIZE && offset + size > m_size) return false;
 
             VkMappedMemoryRange range;
             if (!getRange(offset, size, range)) return false;
@@ -92,7 +95,7 @@ namespace render {
         
         bool Buffer::write(const void* src, u64 offset, u64 size) {
             if (!m_mappedMemory) return false;
-            if (offset + size >= m_size) return false;
+            if (offset + size > m_size) return false;
 
             memcpy(((u8*)m_mappedMemory) + offset, src, size);
             return true;
@@ -100,15 +103,24 @@ namespace render {
         
         bool Buffer::read(u64 offset, u64 size, void* dst, bool fetchFromDevice) {
             if (!m_mappedMemory) return false;
-            if (offset + size >= m_size) return false;
+            if (size == VK_WHOLE_SIZE && offset != 0) return false;
+            if (size != VK_WHOLE_SIZE && offset + size > m_size) return false;
 
-            if (fetchFromDevice) {
-                VkMappedMemoryRange range;
-                if (!getRange(offset, size, range)) return false;
-                if (vkInvalidateMappedMemoryRanges(m_device->get(), 1, &range) != VK_SUCCESS) return false;
-            }
+            if (fetchFromDevice && !fetch(offset, size)) return false;
 
             memcpy(dst, ((u8*)m_mappedMemory) + offset, size);
+            return true;
+        }
+
+        bool Buffer::fetch(u64 offset, u64 size) {
+            if (!m_mappedMemory) return false;
+            if (size == VK_WHOLE_SIZE && offset != 0) return false;
+            if (size != VK_WHOLE_SIZE && offset + size > m_size) return false;
+
+            VkMappedMemoryRange range;
+            if (!getRange(offset, size, range)) return false;
+            if (vkInvalidateMappedMemoryRanges(m_device->get(), 1, &range) != VK_SUCCESS) return false;
+
             return true;
         }
         

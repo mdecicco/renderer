@@ -185,6 +185,7 @@ namespace render {
             m_descriptors.push({
                 nullptr,
                 tex,
+                nullptr,
                 bindingIndex
             });
         }
@@ -193,6 +194,16 @@ namespace render {
             m_descriptors.push({
                 uo,
                 nullptr,
+                nullptr,
+                bindingIndex
+            });
+        }
+
+        void DescriptorSet::add(Buffer* storageBuffer, u32 bindingIndex) {
+            m_descriptors.push({
+                nullptr,
+                nullptr,
+                storageBuffer,
                 bindingIndex
             });
         }
@@ -200,6 +211,7 @@ namespace render {
         void DescriptorSet::update() {
             u32 uboCount = 0;
             u32 texCount = 0;
+            u32 sboCount = 0;
 
             for (u32 i = 0;i < m_descriptors.size();i++) {
                 if (m_descriptors[i].uniform) {
@@ -211,9 +223,14 @@ namespace render {
                     texCount++;
                     continue;
                 }
+
+                if (m_descriptors[i].storageBuffer) {
+                    sboCount++;
+                    continue;
+                }
             }
 
-            Array<VkDescriptorBufferInfo> bi(uboCount);
+            Array<VkDescriptorBufferInfo> bi(uboCount + sboCount);
             Array<VkDescriptorImageInfo> ii(texCount);
             Array<VkWriteDescriptorSet> writes(m_descriptors.size());
 
@@ -261,6 +278,28 @@ namespace render {
                     wd.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                     wd.descriptorCount = 1;
                     wd.pImageInfo = &di;
+
+                    continue;
+                }
+            
+                if (m_descriptors[i].storageBuffer) {
+                    auto b = m_descriptors[i].storageBuffer;
+
+                    bi.push({});
+                    auto& di = bi.last();
+                    di.buffer = b->get();
+                    di.offset = 0;
+                    di.range = VK_WHOLE_SIZE;
+
+                    writes.push({});
+                    auto& wd = writes.last();
+                    wd.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    wd.dstSet = m_set;
+                    wd.dstBinding = m_descriptors[i].bindingIdx;
+                    wd.dstArrayElement = 0;
+                    wd.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    wd.descriptorCount = 1;
+                    wd.pBufferInfo = &di;
 
                     continue;
                 }

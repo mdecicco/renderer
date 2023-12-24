@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 #include <render/IWithRendering.h>
-#include <render/vulkan/Pipeline.h>
+#include <render/vulkan/GraphicsPipeline.h>
 #include <render/vulkan/CommandPool.h>
 #include <render/vulkan/CommandBuffer.h>
 #include <render/vulkan/LogicalDevice.h>
@@ -80,7 +80,7 @@ class TestApp : public IWithRendering {
             if (!initImGui()) return false;
             if (!initDebugDrawing()) return false;
 
-            m_pipeline = new Pipeline(
+            m_pipeline = new GraphicsPipeline(
                 getShaderCompiler(),
                 getLogicalDevice(),
                 getSwapChain(),
@@ -285,7 +285,7 @@ class TestApp : public IWithRendering {
     
     protected:
         Window* m_window;
-        Pipeline* m_pipeline;
+        GraphicsPipeline* m_pipeline;
         Texture* m_texture;
         core::DataFormat m_vfmt;
         core::DataFormat m_ufmt;
