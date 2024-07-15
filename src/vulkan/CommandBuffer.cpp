@@ -74,8 +74,8 @@ namespace render {
 
             return vkResetCommandBuffer(m_buffer, 0) == VK_SUCCESS;
         }
-
-        void CommandBuffer::beginRenderPass(GraphicsPipeline* pipeline, Framebuffer* target) {
+        
+        void CommandBuffer::beginRenderPass(RenderPass* pass, SwapChain* swap, Framebuffer* target) {
             if (!m_buffer || !m_isRecording) return;
 
             VkClearValue clearValues[16] = {};
@@ -86,11 +86,11 @@ namespace render {
 
             VkRenderPassBeginInfo rpi = {};
             rpi.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            rpi.renderPass = pipeline->getRenderPass()->get();
+            rpi.renderPass = pass->get();
             rpi.framebuffer = target->get();
             rpi.renderArea.offset.x = 0;
             rpi.renderArea.offset.y = 0;
-            rpi.renderArea.extent = pipeline->getSwapChain()->getExtent();
+            rpi.renderArea.extent = swap->getExtent();
             rpi.clearValueCount = attachments.size();
             rpi.pClearValues = clearValues;
 
@@ -100,6 +100,10 @@ namespace render {
                 // todo
                 VK_SUBPASS_CONTENTS_INLINE
             );
+        }
+
+        void CommandBuffer::beginRenderPass(GraphicsPipeline* pipeline, Framebuffer* target) {
+            beginRenderPass(pipeline->getRenderPass(), pipeline->getSwapChain(), target);
         }
 
         void CommandBuffer::endRenderPass() {

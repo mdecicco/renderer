@@ -13,6 +13,8 @@ namespace render {
         class Buffer;
         class Vertices;
         class DescriptorSet;
+        class RenderPass;
+        class SwapChain;
 
         class CommandBuffer {
             public:
@@ -26,6 +28,7 @@ namespace render {
                 bool end();
                 bool reset();
 
+                void beginRenderPass(RenderPass* pass, SwapChain* swap, Framebuffer* target);
                 void beginRenderPass(GraphicsPipeline* pipeline, Framebuffer* target);
                 void endRenderPass();
                 void bindPipeline(Pipeline* pipeline, VkPipelineBindPoint bindPoint);
