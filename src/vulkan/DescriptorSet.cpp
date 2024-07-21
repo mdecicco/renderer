@@ -208,6 +208,48 @@ namespace render {
             });
         }
 
+        void DescriptorSet::set(Texture* tex, u32 bindingIndex) {
+            for (u32 i = 0;i < m_descriptors.size();i++) {
+                if (m_descriptors[i].bindingIdx == bindingIndex) {
+                    m_descriptors[i] = {
+                        nullptr,
+                        tex,
+                        nullptr,
+                        bindingIndex
+                    };
+                    break;
+                }
+            }
+        }
+
+        void DescriptorSet::set(UniformObject* uo, u32 bindingIndex) {
+            for (u32 i = 0;i < m_descriptors.size();i++) {
+                if (m_descriptors[i].bindingIdx == bindingIndex) {
+                    m_descriptors[i] = {
+                        uo,
+                        nullptr,
+                        nullptr,
+                        bindingIndex
+                    };
+                    break;
+                }
+            }
+        }
+
+        void DescriptorSet::set(Buffer* storageBuffer, u32 bindingIndex) {
+            for (u32 i = 0;i < m_descriptors.size();i++) {
+                if (m_descriptors[i].bindingIdx == bindingIndex) {
+                    m_descriptors[i] = {
+                        nullptr,
+                        nullptr,
+                        storageBuffer,
+                        bindingIndex
+                    };
+                    break;
+                }
+            }
+        }
+
         void DescriptorSet::update() {
             u32 uboCount = 0;
             u32 texCount = 0;

@@ -50,6 +50,9 @@ namespace render {
                 void add(Texture* tex, u32 bindingIndex);
                 void add(UniformObject* uo, u32 bindingIndex);
                 void add(Buffer* storageBuffer, u32 bindingIndex);
+                void set(Texture* tex, u32 bindingIndex);
+                void set(UniformObject* uo, u32 bindingIndex);
+                void set(Buffer* storageBuffer, u32 bindingIndex);
                 void update();
 
                 void free();
