@@ -185,11 +185,11 @@ namespace render {
         bool Texture::initSampler() {
             VkSamplerCreateInfo si = {};
             si.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-            si.magFilter = VK_FILTER_NEAREST;
-            si.minFilter = VK_FILTER_NEAREST;
-            si.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            si.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            si.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            si.magFilter = VK_FILTER_LINEAR;
+            si.minFilter = VK_FILTER_LINEAR;
+            si.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            si.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            si.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
             si.anisotropyEnable = VK_TRUE;
             si.maxAnisotropy = m_device->getPhysicalDevice()->getProperties().limits.maxSamplerAnisotropy;
             si.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
@@ -298,6 +298,12 @@ namespace render {
 
                 srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
                 dstStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            } else if (m_layout == VK_IMAGE_LAYOUT_UNDEFINED && layout == VK_IMAGE_LAYOUT_GENERAL) {
+                b.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                b.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+
+                srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
+                dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
             } else {
                 m_device->getInstance()->error("Invalid layout transition");
                 return false;
